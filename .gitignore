@@ -1,0 +1,46 @@
+# Workspace-level ignore rules for subprojects
+
+# =========================
+# Auth-FrontEnd (Next.js)
+# =========================
+/Auth-FrontEnd/node_modules/
+/Auth-FrontEnd/.pnp
+/Auth-FrontEnd/.pnp.*
+/Auth-FrontEnd/.yarn/*
+!/Auth-FrontEnd/.yarn/patches
+!/Auth-FrontEnd/.yarn/plugins
+!/Auth-FrontEnd/.yarn/releases
+!/Auth-FrontEnd/.yarn/versions
+
+/Auth-FrontEnd/.next/
+/Auth-FrontEnd/out/
+/Auth-FrontEnd/build/
+/Auth-FrontEnd/coverage/
+/Auth-FrontEnd/.vercel/
+/Auth-FrontEnd/*.tsbuildinfo
+/Auth-FrontEnd/*.pem
+/Auth-FrontEnd/next-env.d.ts
+/Auth-FrontEnd/.env*
+!/Auth-FrontEnd/.env.example
+
+# =========================
+# Auth-REST-API (Node.js)
+# =========================
+/Auth-REST-API/node_modules/
+/Auth-REST-API/.env
+!/Auth-REST-API/.env.example
+/Auth-REST-API/data/*.db
+/Auth-REST-API/data/*.db-shm
+/Auth-REST-API/data/*.db-wal
+/Auth-REST-API/mnt/user-data/outputs/
+
+# =========================
+# Common logs / OS files
+# =========================
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.pnpm-debug.log*
+**/*.log
+**/.DS_Store
+**/Thumbs.db
