@@ -6,7 +6,9 @@ const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
-router.use(requireAuth);
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
 
 function parseItemId(value) {
   const itemId = Number.parseInt(value, 10);
@@ -18,6 +20,22 @@ function parseInteger(value, fieldName, { min = null } = {}) {
   if (min !== null && value < min)
     return `${fieldName} must be greater than or equal to ${min}`;
   return null;
+}
+
+function parsePrice(value) {
+  if (value === undefined) {
+    return { value: 0 };
+  }
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return { error: "price must be a number" };
+  }
+
+  if (value < 0) {
+    return { error: "price must be greater than or equal to 0" };
+  }
+
+  return { value };
 }
 
 function parseOptionalImageBlob(itemImage) {
@@ -41,6 +59,7 @@ function toWishlistResponse(row) {
     description: row.description,
     url: row.url,
     item_image: row.item_image ? row.item_image.toString("base64") : null,
+    price: Number(row.price ?? 0),
     priority: row.priority,
     quantity: row.quantity,
     purchased: !!row.purchased,
@@ -49,12 +68,51 @@ function toWishlistResponse(row) {
   };
 }
 
+router.get("/public/by-email", (req, res) => {
+  const email = String(req.query.email ?? "")
+    .trim()
+    .toLowerCase();
+
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "Valid email is required" });
+  }
+
+  const db = getDb();
+  const user = db
+    .prepare("SELECT id, name FROM users WHERE lower(email) = ?")
+    .get(email);
+
+  if (!user) {
+    return res.json({ found: false, user: null, items: [] });
+  }
+
+  const items = db
+    .prepare(
+      `
+        SELECT *
+        FROM wishlist
+        WHERE userid = ?
+        ORDER BY sequence ASC, created_date DESC, item_id DESC
+      `,
+    )
+    .all(user.id);
+
+  return res.json({
+    found: true,
+    user: { name: user.name },
+    items: items.map(toWishlistResponse),
+  });
+});
+
+router.use(requireAuth);
+
 router.post("/", (req, res) => {
   const {
     title,
     description,
     url,
     item_image,
+    price,
     priority,
     quantity,
     purchased,
@@ -94,12 +152,17 @@ router.post("/", (req, res) => {
   const image = parseOptionalImageBlob(item_image);
   if (image.error) return res.status(400).json({ error: image.error });
 
+  const parsedPrice = parsePrice(price);
+  if (parsedPrice.error) {
+    return res.status(400).json({ error: parsedPrice.error });
+  }
+
   const db = getDb();
   const result = db
     .prepare(
       `
-      INSERT INTO wishlist (userid, title, description, url, item_image, priority, quantity, purchased, sequence)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO wishlist (userid, title, description, url, item_image, price, priority, quantity, purchased, sequence)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     )
     .run(
@@ -108,6 +171,7 @@ router.post("/", (req, res) => {
       description ?? null,
       url ?? null,
       image.blob ?? null,
+      parsedPrice.value,
       priority ?? 1,
       quantity ?? 1,
       purchased ? 1 : 0,
@@ -157,6 +221,7 @@ router.put("/:itemId", (req, res) => {
     description,
     url,
     item_image,
+    price,
     priority,
     quantity,
     purchased,
@@ -199,6 +264,15 @@ router.put("/:itemId", (req, res) => {
     if (image.error) return res.status(400).json({ error: image.error });
     updates.push("item_image = ?");
     values.push(image.blob);
+  }
+
+  if (price !== undefined) {
+    const parsedPrice = parsePrice(price);
+    if (parsedPrice.error) {
+      return res.status(400).json({ error: parsedPrice.error });
+    }
+    updates.push("price = ?");
+    values.push(parsedPrice.value);
   }
 
   if (priority !== undefined) {

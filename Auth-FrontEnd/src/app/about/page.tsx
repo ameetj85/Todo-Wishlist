@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 
 import {
@@ -19,7 +20,17 @@ export default async function AboutPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col justify-center gap-4 px-6 py-12">
+    <main className="relative mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col justify-center gap-4 overflow-hidden px-6 py-12">
+      <Image
+        src="/appLogo.png"
+        alt=""
+        width={220}
+        height={220}
+        aria-hidden="true"
+        className="pointer-events-none absolute right-4 top-4 w-24 opacity-90 sm:right-6 sm:top-6 sm:w-32"
+        priority
+      />
+
       <Card className="w-full">
         <CardHeader>
           <CardTitle>About your session</CardTitle>

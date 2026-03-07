@@ -36,6 +36,41 @@ const TODO_DESCRIPTIONS = [
   "Close all open action items",
 ];
 
+const WISHLIST_TITLES = [
+  "Mechanical keyboard",
+  "Noise-canceling headphones",
+  "Standing desk",
+  "4K monitor",
+  "Travel backpack",
+  "Fitness tracker",
+  "Espresso machine",
+  "Bluetooth speaker",
+  "Smart desk lamp",
+  "Running shoes",
+];
+
+const WISHLIST_DESCRIPTIONS = [
+  "Save for next quarter purchase",
+  "Compare prices across vendors",
+  "Need this for improving daily workflow",
+  "Potential gift idea",
+  "Research completed, waiting for discount",
+  "Useful for home office setup",
+];
+
+const WISHLIST_URLS = [
+  "https://example.com/products/keyboard",
+  "https://example.com/products/headphones",
+  "https://example.com/products/desk",
+  "https://example.com/products/monitor",
+  "https://example.com/products/backpack",
+  "https://example.com/products/tracker",
+  "https://example.com/products/speaker",
+  "https://example.com/products/lamp",
+  null,
+  null,
+];
+
 function pickRandom(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
@@ -79,6 +114,63 @@ function seedTodos(db) {
   );
 }
 
+function seedWishlists(db) {
+  const users = db.prepare("SELECT id, name FROM users").all();
+  if (users.length === 0) {
+    console.log("   ⏭  Skipped wishlist seeding (no users found)");
+    return;
+  }
+
+  const insertWishlist = db.prepare(`
+    INSERT INTO wishlist (
+      userid,
+      title,
+      description,
+      url,
+      item_image,
+      price,
+      priority,
+      quantity,
+      purchased,
+      sequence
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  let inserted = 0;
+  for (const user of users) {
+    const wishlistCount = Math.floor(Math.random() * 4) + 2;
+    for (let i = 0; i < wishlistCount; i += 1) {
+      const title = pickRandom(WISHLIST_TITLES);
+      const description = `${pickRandom(WISHLIST_DESCRIPTIONS)} for ${user.name}`;
+      const url = pickRandom(WISHLIST_URLS);
+      const price = Number((Math.random() * 500 + 10).toFixed(2));
+      const priority = Math.floor(Math.random() * 3); // 0,1,2
+      const quantity = Math.floor(Math.random() * 3) + 1;
+      const purchased = Math.random() < 0.2 ? 1 : 0;
+      const sequence = i + 1;
+
+      insertWishlist.run(
+        user.id,
+        title,
+        description,
+        url,
+        null,
+        price,
+        priority,
+        quantity,
+        purchased,
+        sequence,
+      );
+      inserted += 1;
+    }
+  }
+
+  console.log(
+    `   ✅ Inserted ${inserted} wishlist items across ${users.length} users`,
+  );
+}
+
 async function seed() {
   const db = getDb();
 
@@ -104,6 +196,9 @@ async function seed() {
 
   console.log("\n📝 Seeding todos for users...\n");
   seedTodos(db);
+
+  console.log("\n🎁 Seeding wishlists for users...\n");
+  seedWishlists(db);
 
   console.log("\nDone.");
 }

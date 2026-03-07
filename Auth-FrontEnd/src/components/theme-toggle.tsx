@@ -19,7 +19,8 @@ export function ThemeToggle() {
       <Button
         type="button"
         size="icon"
-        className="bg-blue-500 text-white hover:bg-blue-600"
+        variant="outline"
+        className="border-blue-500 bg-background text-blue-600 hover:bg-background/80 dark:text-blue-400"
         aria-label="Toggle theme"
         title="Toggle theme"
       />
@@ -33,7 +34,8 @@ export function ThemeToggle() {
     <Button
       type="button"
       size="icon"
-      className="bg-blue-500 text-white hover:bg-blue-600"
+      variant="outline"
+      className="border-blue-500 bg-background text-blue-600 hover:bg-background/80 dark:text-blue-400"
       aria-label={hintText}
       title={hintText}
       onClick={() => setTheme(isDark ? "light" : "dark")}

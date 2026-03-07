@@ -124,13 +124,14 @@ describe("Database", () => {
 
     const row1 = db
       .prepare(
-        "SELECT priority, quantity, purchased, sequence, created_date FROM wishlist WHERE item_id = ?",
+        "SELECT price, priority, quantity, purchased, sequence, created_date FROM wishlist WHERE item_id = ?",
       )
       .get(first.lastInsertRowid);
     const row2 = db
       .prepare("SELECT sequence FROM wishlist WHERE item_id = ?")
       .get(second.lastInsertRowid);
 
+    assert.equal(row1.price, 0);
     assert.equal(row1.priority, 1);
     assert.equal(row1.quantity, 1);
     assert.equal(row1.purchased, 0);

@@ -71,6 +71,42 @@ async function signupAndGetToken(email = "wish-user@example.com") {
 }
 
 describe("Wishlist CRUD Routes", () => {
+  it("allows public wishlist lookup by email", async () => {
+    const ownerEmail = "public-owner@example.com";
+    const token = await signupAndGetToken(ownerEmail);
+
+    await request(
+      app,
+      "POST",
+      "/api/wishlist",
+      { title: "Public Item" },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    const res = await request(
+      app,
+      "GET",
+      `/api/wishlist/public/by-email?email=${encodeURIComponent(ownerEmail)}`,
+    );
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.found, true);
+    assert.equal(res.body.items.length, 1);
+    assert.equal(res.body.items[0].title, "Public Item");
+  });
+
+  it("returns not found payload for unknown public wishlist email", async () => {
+    const res = await request(
+      app,
+      "GET",
+      `/api/wishlist/public/by-email?email=${encodeURIComponent("missing@example.com")}`,
+    );
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.found, false);
+    assert.deepEqual(res.body.items, []);
+  });
+
   it("creates a wishlist item", async () => {
     const token = await signupAndGetToken();
     const imageB64 = Buffer.from("img-bytes").toString("base64");
@@ -90,6 +126,7 @@ describe("Wishlist CRUD Routes", () => {
 
     assert.equal(res.status, 201);
     assert.equal(res.body.item.title, "Mechanical Keyboard");
+    assert.equal(res.body.item.price, 0);
     assert.equal(res.body.item.priority, 2);
     assert.equal(res.body.item.quantity, 1);
     assert.equal(res.body.item.purchased, false);
@@ -163,7 +200,13 @@ describe("Wishlist CRUD Routes", () => {
       app,
       "PUT",
       `/api/wishlist/${itemId}`,
-      { title: "New title", purchased: true, quantity: 2, priority: 0 },
+      {
+        title: "New title",
+        purchased: true,
+        quantity: 2,
+        priority: 0,
+        price: 129.99,
+      },
       { Authorization: `Bearer ${token}` },
     );
 
@@ -172,6 +215,7 @@ describe("Wishlist CRUD Routes", () => {
     assert.equal(update.body.item.purchased, true);
     assert.equal(update.body.item.quantity, 2);
     assert.equal(update.body.item.priority, 0);
+    assert.equal(update.body.item.price, 129.99);
   });
 
   it("deletes a wishlist item", async () => {
@@ -219,6 +263,15 @@ describe("Wishlist CRUD Routes", () => {
       { Authorization: `Bearer ${token}` },
     );
     assert.equal(badQuantity.status, 400);
+
+    const badPrice = await request(
+      app,
+      "POST",
+      "/api/wishlist",
+      { title: "Bad", price: -1 },
+      { Authorization: `Bearer ${token}` },
+    );
+    assert.equal(badPrice.status, 400);
   });
 
   it("rejects unauthenticated access", async () => {

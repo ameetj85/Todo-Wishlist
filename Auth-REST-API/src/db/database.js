@@ -68,6 +68,7 @@ function initSchema(db) {
       description   TEXT,
       url           TEXT,
       item_image    BLOB,
+      price         REAL NOT NULL DEFAULT 0.00 CHECK (price >= 0),
       priority      INTEGER NOT NULL DEFAULT 1 CHECK (priority IN (0, 1, 2)),
       quantity      INTEGER NOT NULL DEFAULT 1,
       purchased     INTEGER NOT NULL DEFAULT 0 CHECK (purchased IN (0, 1)),
@@ -126,6 +127,19 @@ function initSchema(db) {
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_todo_user_created_date_desc ON Todo(user_id, created_date DESC)",
   );
+
+  const wishlistColumns = db.prepare("PRAGMA table_info(wishlist)").all();
+  const hasWishlistPrice = wishlistColumns.some(
+    (column) => column.name === "price",
+  );
+
+  if (!hasWishlistPrice) {
+    db.exec(
+      "ALTER TABLE wishlist ADD COLUMN price REAL NOT NULL DEFAULT 0.00 CHECK (price >= 0)",
+    );
+  }
+
+  db.exec("UPDATE wishlist SET price = 0.00 WHERE price IS NULL OR price < 0");
 
   db.exec("DROP TRIGGER IF EXISTS trg_wishlist_set_sequence");
   db.exec(`

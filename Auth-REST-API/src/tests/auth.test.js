@@ -174,10 +174,13 @@ describe("POST /api/auth/logout", () => {
   it("invalidates the session token", async () => {
     const signup = await request(app, "POST", "/api/auth/signup", VALID_USER);
     const token = signup.body.token;
+    assert.ok(getSession(token));
+
     const logout = await request(app, "POST", "/api/auth/logout", null, {
       Authorization: `Bearer ${token}`,
     });
     assert.equal(logout.status, 200);
+    assert.equal(getSession(token), undefined);
 
     // Token should no longer work
     const me = await request(app, "GET", "/api/auth/me", null, {
