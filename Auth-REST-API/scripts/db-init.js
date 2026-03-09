@@ -1,13 +1,25 @@
 #!/usr/bin/env node
 'use strict';
 // npm run db:init
-// Initializes the database schema (safe to re-run — uses CREATE IF NOT EXISTS)
+// Initializes the database schema via Prisma.
 
 require('dotenv').config();
-const { getDb } = require('../src/db/database');
+const { prisma, getDatabaseUrl } = require('../src/db/prisma');
 
-const db = getDb();
-const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
-console.log('✅ Database initialized successfully.');
-console.log('   Tables:', tables.map(t => t.name).join(', '));
-console.log('   Path  :', process.env.DB_PATH || './data/auth.db');
+async function main() {
+	const tableRows = await prisma.$queryRawUnsafe(
+		"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+	);
+	console.log('✅ Database initialized successfully.');
+	console.log('   Tables:', tableRows.map((t) => t.name).join(', '));
+	console.log('   URL   :', getDatabaseUrl());
+}
+
+main()
+	.catch((err) => {
+		console.error(err);
+		process.exitCode = 1;
+	})
+	.finally(async () => {
+		await prisma.$disconnect();
+	});

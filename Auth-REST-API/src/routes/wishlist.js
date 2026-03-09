@@ -1,8 +1,9 @@
 "use strict";
 
 const express = require("express");
-const { getDb } = require("../db/database");
+const { prisma } = require("../db/prisma");
 const { requireAuth } = require("../middleware/auth");
+const { toSqliteDateOnly } = require("../utils/dates");
 
 const router = express.Router();
 
@@ -53,22 +54,35 @@ function parseOptionalImageBlob(itemImage) {
 
 function toWishlistResponse(row) {
   return {
-    item_id: row.item_id,
-    userid: row.userid,
+    item_id: row.itemId,
+    userid: row.userId,
     title: row.title,
     description: row.description,
     url: row.url,
-    item_image: row.item_image ? row.item_image.toString("base64") : null,
+    item_image: row.itemImage ? Buffer.from(row.itemImage).toString("base64") : null,
     price: Number(row.price ?? 0),
     priority: row.priority,
     quantity: row.quantity,
     purchased: !!row.purchased,
     sequence: row.sequence,
-    created_date: row.created_date,
+    created_date: row.createdDate,
   };
 }
 
-router.get("/public/by-email", (req, res) => {
+async function resolveSequenceForCreate(userId, requestedSequence) {
+  if (requestedSequence !== undefined && requestedSequence !== 0) {
+    return requestedSequence;
+  }
+
+  const maxResult = await prisma.wishlistItem.aggregate({
+    where: { userId },
+    _max: { sequence: true },
+  });
+
+  return (maxResult._max.sequence ?? 0) + 1;
+}
+
+router.get("/public/by-email", async (req, res) => {
   const email = String(req.query.email ?? "")
     .trim()
     .toLowerCase();
@@ -77,25 +91,19 @@ router.get("/public/by-email", (req, res) => {
     return res.status(400).json({ error: "Valid email is required" });
   }
 
-  const db = getDb();
-  const user = db
-    .prepare("SELECT id, name FROM users WHERE lower(email) = ?")
-    .get(email);
+  const user = await prisma.user.findFirst({
+    where: { email },
+    select: { id: true, name: true },
+  });
 
   if (!user) {
     return res.json({ found: false, user: null, items: [] });
   }
 
-  const items = db
-    .prepare(
-      `
-        SELECT *
-        FROM wishlist
-        WHERE userid = ?
-        ORDER BY sequence ASC, created_date DESC, item_id DESC
-      `,
-    )
-    .all(user.id);
+  const items = await prisma.wishlistItem.findMany({
+    where: { userId: user.id },
+    orderBy: [{ sequence: "asc" }, { createdDate: "desc" }, { itemId: "desc" }],
+  });
 
   return res.json({
     found: true,
@@ -104,9 +112,53 @@ router.get("/public/by-email", (req, res) => {
   });
 });
 
+router.patch("/public/purchased", async (req, res) => {
+  const email = String(req.body?.email ?? "")
+    .trim()
+    .toLowerCase();
+  const itemId = parseItemId(req.body?.item_id);
+  const purchased = req.body?.purchased;
+
+  if (!email || !isValidEmail(email)) {
+    return res.status(400).json({ error: "Valid email is required" });
+  }
+
+  if (!itemId) {
+    return res.status(400).json({ error: "Valid item_id is required" });
+  }
+
+  if (typeof purchased !== "boolean") {
+    return res.status(400).json({ error: "purchased must be a boolean" });
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { email },
+    select: { id: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: "Wishlist owner not found" });
+  }
+
+  const result = await prisma.wishlistItem.updateMany({
+    where: { itemId, userId: user.id },
+    data: { purchased },
+  });
+
+  if (result.count === 0) {
+    return res.status(404).json({ error: "Wishlist item not found" });
+  }
+
+  const item = await prisma.wishlistItem.findFirst({
+    where: { itemId, userId: user.id },
+  });
+
+  return res.json({ item: toWishlistResponse(item) });
+});
+
 router.use(requireAuth);
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const {
     title,
     description,
@@ -157,62 +209,49 @@ router.post("/", (req, res) => {
     return res.status(400).json({ error: parsedPrice.error });
   }
 
-  const db = getDb();
-  const result = db
-    .prepare(
-      `
-      INSERT INTO wishlist (userid, title, description, url, item_image, price, priority, quantity, purchased, sequence)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `,
-    )
-    .run(
-      req.user.id,
-      title.trim(),
-      description ?? null,
-      url ?? null,
-      image.blob ?? null,
-      parsedPrice.value,
-      priority ?? 1,
-      quantity ?? 1,
-      purchased ? 1 : 0,
-      sequence ?? 0,
-    );
+  const finalSequence = await resolveSequenceForCreate(req.user.id, sequence);
 
-  const item = db
-    .prepare("SELECT * FROM wishlist WHERE item_id = ? AND userid = ?")
-    .get(result.lastInsertRowid, req.user.id);
+  const item = await prisma.wishlistItem.create({
+    data: {
+      userId: req.user.id,
+      title: title.trim(),
+      description: description ?? null,
+      url: url ?? null,
+      itemImage: image.blob ?? null,
+      price: parsedPrice.value,
+      priority: priority ?? 1,
+      quantity: quantity ?? 1,
+      purchased: !!purchased,
+      sequence: finalSequence,
+      createdDate: toSqliteDateOnly(Date.now()),
+    },
+  });
 
   return res.status(201).json({ item: toWishlistResponse(item) });
 });
 
-router.get("/", (req, res) => {
-  const items = getDb()
-    .prepare(
-      `
-        SELECT *
-        FROM wishlist
-        WHERE userid = ?
-        ORDER BY sequence ASC, created_date DESC, item_id DESC
-      `,
-    )
-    .all(req.user.id);
+router.get("/", async (req, res) => {
+  const items = await prisma.wishlistItem.findMany({
+    where: { userId: req.user.id },
+    orderBy: [{ sequence: "asc" }, { createdDate: "desc" }, { itemId: "desc" }],
+  });
 
   return res.json({ items: items.map(toWishlistResponse) });
 });
 
-router.get("/:itemId", (req, res) => {
+router.get("/:itemId", async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
   if (!itemId) return res.status(400).json({ error: "Invalid item_id" });
 
-  const item = getDb()
-    .prepare("SELECT * FROM wishlist WHERE item_id = ? AND userid = ?")
-    .get(itemId, req.user.id);
+  const item = await prisma.wishlistItem.findFirst({
+    where: { itemId, userId: req.user.id },
+  });
 
   if (!item) return res.status(404).json({ error: "Wishlist item not found" });
   return res.json({ item: toWishlistResponse(item) });
 });
 
-router.put("/:itemId", (req, res) => {
+router.put("/:itemId", async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
   if (!itemId) return res.status(400).json({ error: "Invalid item_id" });
 
@@ -228,8 +267,7 @@ router.put("/:itemId", (req, res) => {
     sequence,
   } = req.body;
 
-  const updates = [];
-  const values = [];
+  const data = {};
 
   if (title !== undefined) {
     if (typeof title !== "string" || !title.trim()) {
@@ -237,8 +275,7 @@ router.put("/:itemId", (req, res) => {
         .status(400)
         .json({ error: "title must be a non-empty string" });
     }
-    updates.push("title = ?");
-    values.push(title.trim());
+    data.title = title.trim();
   }
 
   if (description !== undefined) {
@@ -247,23 +284,20 @@ router.put("/:itemId", (req, res) => {
         .status(400)
         .json({ error: "description must be a string or null" });
     }
-    updates.push("description = ?");
-    values.push(description);
+    data.description = description;
   }
 
   if (url !== undefined) {
     if (url !== null && typeof url !== "string") {
       return res.status(400).json({ error: "url must be a string or null" });
     }
-    updates.push("url = ?");
-    values.push(url);
+    data.url = url;
   }
 
   if (item_image !== undefined) {
     const image = parseOptionalImageBlob(item_image);
     if (image.error) return res.status(400).json({ error: image.error });
-    updates.push("item_image = ?");
-    values.push(image.blob);
+    data.itemImage = image.blob;
   }
 
   if (price !== undefined) {
@@ -271,8 +305,7 @@ router.put("/:itemId", (req, res) => {
     if (parsedPrice.error) {
       return res.status(400).json({ error: parsedPrice.error });
     }
-    updates.push("price = ?");
-    values.push(parsedPrice.value);
+    data.price = parsedPrice.value;
   }
 
   if (priority !== undefined) {
@@ -281,69 +314,59 @@ router.put("/:itemId", (req, res) => {
         .status(400)
         .json({ error: "priority must be one of 0, 1, or 2" });
     }
-    updates.push("priority = ?");
-    values.push(priority);
+    data.priority = priority;
   }
 
   if (quantity !== undefined) {
     const quantityErr = parseInteger(quantity, "quantity", { min: 1 });
     if (quantityErr) return res.status(400).json({ error: quantityErr });
-    updates.push("quantity = ?");
-    values.push(quantity);
+    data.quantity = quantity;
   }
 
   if (purchased !== undefined) {
     if (typeof purchased !== "boolean") {
       return res.status(400).json({ error: "purchased must be a boolean" });
     }
-    updates.push("purchased = ?");
-    values.push(purchased ? 1 : 0);
+    data.purchased = purchased;
   }
 
   if (sequence !== undefined) {
     const sequenceErr = parseInteger(sequence, "sequence", { min: 0 });
     if (sequenceErr) return res.status(400).json({ error: sequenceErr });
-    updates.push("sequence = ?");
-    values.push(sequence);
+    data.sequence = sequence;
   }
 
-  if (updates.length === 0) {
+  if (Object.keys(data).length === 0) {
     return res
       .status(400)
       .json({ error: "At least one updatable field is required" });
   }
 
-  const db = getDb();
-  const result = db
-    .prepare(
-      `
-      UPDATE wishlist
-      SET ${updates.join(", ")}
-      WHERE item_id = ? AND userid = ?
-    `,
-    )
-    .run(...values, itemId, req.user.id);
+  const result = await prisma.wishlistItem.updateMany({
+    where: { itemId, userId: req.user.id },
+    data,
+  });
 
-  if (result.changes === 0) {
+  if (result.count === 0) {
     return res.status(404).json({ error: "Wishlist item not found" });
   }
 
-  const item = db
-    .prepare("SELECT * FROM wishlist WHERE item_id = ? AND userid = ?")
-    .get(itemId, req.user.id);
+  const item = await prisma.wishlistItem.findFirst({
+    where: { itemId, userId: req.user.id },
+  });
 
   return res.json({ item: toWishlistResponse(item) });
 });
 
-router.delete("/:itemId", (req, res) => {
+router.delete("/:itemId", async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
   if (!itemId) return res.status(400).json({ error: "Invalid item_id" });
 
-  const result = getDb()
-    .prepare("DELETE FROM wishlist WHERE item_id = ? AND userid = ?")
-    .run(itemId, req.user.id);
+  const result = await prisma.wishlistItem.deleteMany({
+    where: { itemId, userId: req.user.id },
+  });
 
-  if (result.changes === 0) {
+  if (result.count === 0) {
     return res.status(404).json({ error: "Wishlist item not found" });
   }
 

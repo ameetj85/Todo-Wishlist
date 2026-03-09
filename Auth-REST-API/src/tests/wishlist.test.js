@@ -1,6 +1,6 @@
 "use strict";
 
-process.env.DB_PATH = ":memory:";
+process.env.DATABASE_URL = "file:./data/test.db";
 process.env.SESSION_EXPIRY_HOURS = "24";
 process.env.RESET_TOKEN_EXPIRY_MINUTES = "60";
 process.env.BCRYPT_ROUNDS = "4";
@@ -105,6 +105,41 @@ describe("Wishlist CRUD Routes", () => {
     assert.equal(res.status, 200);
     assert.equal(res.body.found, false);
     assert.deepEqual(res.body.items, []);
+  });
+
+  it("allows public viewers to mark an item as purchased", async () => {
+    const ownerEmail = "public-purchase-owner@example.com";
+    const token = await signupAndGetToken(ownerEmail);
+
+    const created = await request(
+      app,
+      "POST",
+      "/api/wishlist",
+      { title: "Public Purchase Item", purchased: false },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    const itemId = created.body.item.item_id;
+
+    const patchRes = await request(app, "PATCH", "/api/wishlist/public/purchased", {
+      email: ownerEmail,
+      item_id: itemId,
+      purchased: true,
+    });
+
+    assert.equal(patchRes.status, 200);
+    assert.equal(patchRes.body.item.item_id, itemId);
+    assert.equal(patchRes.body.item.purchased, true);
+
+    const unpatchRes = await request(app, "PATCH", "/api/wishlist/public/purchased", {
+      email: ownerEmail,
+      item_id: itemId,
+      purchased: false,
+    });
+
+    assert.equal(unpatchRes.status, 200);
+    assert.equal(unpatchRes.body.item.item_id, itemId);
+    assert.equal(unpatchRes.body.item.purchased, false);
   });
 
   it("creates a wishlist item", async () => {

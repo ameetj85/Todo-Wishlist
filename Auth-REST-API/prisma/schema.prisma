@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String               @id
+  email              String               @unique
+  password           String
+  name               String
+  isVerified         Boolean              @default(false) @map("is_verified")
+  createdAt          String               @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  updatedAt          String               @default(dbgenerated("(datetime('now'))")) @map("updated_at")
+  sessions           Session[]
+  resetTokens        PasswordResetToken[]
+  todos              Todo[]
+  wishlistItems      WishlistItem[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String  @id
+  userId    String  @map("user_id")
+  token     String  @unique
+  expiresAt String  @map("expires_at")
+  createdAt String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_sessions_user_id")
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String  @id
+  userId    String  @map("user_id")
+  token     String  @unique
+  expiresAt String  @map("expires_at")
+  used      Boolean @default(false)
+  createdAt String  @default(dbgenerated("(datetime('now'))")) @map("created_at")
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model Todo {
+  todoId       Int     @id @default(autoincrement()) @map("todo_id")
+  userId       String  @map("user_id")
+  name         String
+  description  String
+  dueDate      String? @map("due_date")
+  createdDate  String  @default(dbgenerated("(date('now'))")) @map("created_date")
+  category     String
+  completed    Boolean @default(false)
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "idx_todo_user_id")
+  @@index([dueDate], map: "idx_todo_due_date")
+  @@index([userId, createdDate], map: "idx_todo_user_created_date_desc")
+  @@map("Todo")
+}
+
+model WishlistItem {
+  itemId       Int      @id @default(autoincrement()) @map("item_id")
+  userId       String   @map("userid")
+  title        String
+  description  String?
+  url          String?
+  itemImage    Bytes?   @map("item_image")
+  price        Float    @default(0)
+  priority     Int      @default(1)
+  quantity     Int      @default(1)
+  purchased    Boolean  @default(false)
+  sequence     Int      @default(0)
+  createdDate  String   @default(dbgenerated("(date('now'))")) @map("created_date")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, sequence], map: "idx_wishlist_userid_sequence")
+  @@map("wishlist")
+}

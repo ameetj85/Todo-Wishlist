@@ -1,21 +1,16 @@
 'use strict';
 
 const express = require('express');
-const bcrypt  = require('bcryptjs');
+const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
-const { getDb }  = require('../db/database');
+const { prisma } = require('../db/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { sendPasswordResetEmail } = require('../utils/email');
+const { toSqliteDate } = require('../utils/dates');
 const config = require('../config');
 const { validateSignup, validateLogin, validatePassword } = require('../validators');
 
 const router = express.Router();
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function toSqliteDate(ms) {
-  return new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
-}
 
 function sessionExpiry() {
   return toSqliteDate(Date.now() + config.session.expiryHours * 3_600_000);
@@ -25,17 +20,23 @@ function resetTokenExpiry() {
   return toSqliteDate(Date.now() + config.passwordReset.expiryMinutes * 60_000);
 }
 
-function createSession(db, userId, req) {
-  const token     = uuidv4();
+async function createSession(userId, req) {
+  const token = uuidv4();
   const sessionId = uuidv4();
-  db.prepare(`
-    INSERT INTO sessions (id, user_id, token, expires_at, ip_address, user_agent)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(sessionId, userId, token, sessionExpiry(), req.ip, req.headers['user-agent'] || null);
+
+  await prisma.session.create({
+    data: {
+      id: sessionId,
+      userId,
+      token,
+      expiresAt: sessionExpiry(),
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'] || null,
+    },
+  });
+
   return token;
 }
-
-// ─── POST /signup ─────────────────────────────────────────────────────────────
 
 router.post('/signup', async (req, res) => {
   const { email, password, name } = req.body;
@@ -43,30 +44,37 @@ router.post('/signup', async (req, res) => {
   const err = validateSignup({ email, password, name });
   if (err) return res.status(400).json({ error: err });
 
-  const db = getDb();
   const normalizedEmail = email.toLowerCase().trim();
+  const existing = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+    select: { id: true },
+  });
 
-  if (db.prepare('SELECT id FROM users WHERE email = ?').get(normalizedEmail)) {
+  if (existing) {
     return res.status(409).json({ error: 'An account with this email already exists' });
   }
 
-  const hash   = await bcrypt.hash(password, config.bcrypt.saltRounds);
+  const hash = await bcrypt.hash(password, config.bcrypt.saltRounds);
   const userId = uuidv4();
 
-  db.prepare('INSERT INTO users (id, email, password, name) VALUES (?, ?, ?, ?)')
-    .run(userId, normalizedEmail, hash, name.trim());
+  await prisma.user.create({
+    data: {
+      id: userId,
+      email: normalizedEmail,
+      password: hash,
+      name: name.trim(),
+    },
+  });
 
-  const token = createSession(db, userId, req);
+  const token = await createSession(userId, req);
 
   return res.status(201).json({
-    message:   'Account created successfully',
+    message: 'Account created successfully',
     token,
     expiresIn: `${config.session.expiryHours}h`,
     user: { id: userId, email: normalizedEmail, name: name.trim() },
   });
 });
-
-// ─── POST /login ──────────────────────────────────────────────────────────────
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -74,81 +82,96 @@ router.post('/login', async (req, res) => {
   const err = validateLogin({ email, password });
   if (err) return res.status(400).json({ error: err });
 
-  const db   = getDb();
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+  });
 
-  // Always bcrypt-compare to prevent timing attacks
-  const hash  = user?.password ?? '$2a$12$invalidhashfortimingpurposes000000000000000000';
+  const hash = user?.password ?? '$2a$12$invalidhashfortimingpurposes000000000000000000';
   const match = await bcrypt.compare(password, hash);
 
   if (!user || !match) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
-  // Purge this user's expired sessions
-  db.prepare(`DELETE FROM sessions WHERE user_id = ? AND expires_at <= datetime('now')`).run(user.id);
+  await prisma.session.deleteMany({
+    where: {
+      userId: user.id,
+      expiresAt: { lte: toSqliteDate(Date.now()) },
+    },
+  });
 
-  const token = createSession(db, user.id, req);
+  const token = await createSession(user.id, req);
 
   return res.json({
-    message:   'Login successful',
+    message: 'Login successful',
     token,
     expiresIn: `${config.session.expiryHours}h`,
-    user: { id: user.id, email: user.email, name: user.name, isVerified: !!user.is_verified },
+    user: { id: user.id, email: user.email, name: user.name, isVerified: !!user.isVerified },
   });
 });
 
-// ─── POST /logout ─────────────────────────────────────────────────────────────
-
-router.post('/logout', requireAuth, (req, res) => {
-  getDb().prepare('DELETE FROM sessions WHERE id = ?').run(req.sessionId);
+router.post('/logout', requireAuth, async (req, res) => {
+  await prisma.session.deleteMany({ where: { id: req.sessionId } });
   return res.json({ message: 'Logged out successfully' });
 });
 
-// ─── POST /logout-all ─────────────────────────────────────────────────────────
-
-router.post('/logout-all', requireAuth, (req, res) => {
-  getDb().prepare('DELETE FROM sessions WHERE user_id = ?').run(req.user.id);
+router.post('/logout-all', requireAuth, async (req, res) => {
+  await prisma.session.deleteMany({ where: { userId: req.user.id } });
   return res.json({ message: 'All sessions terminated' });
 });
-
-// ─── GET /me ──────────────────────────────────────────────────────────────────
 
 router.get('/me', requireAuth, (req, res) => {
   return res.json({ user: req.user });
 });
 
-// ─── GET /sessions ────────────────────────────────────────────────────────────
+router.get('/sessions', requireAuth, async (req, res) => {
+  const sessions = await prisma.session.findMany({
+    where: {
+      userId: req.user.id,
+      expiresAt: { gt: toSqliteDate(Date.now()) },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      createdAt: true,
+      expiresAt: true,
+      ipAddress: true,
+      userAgent: true,
+    },
+  });
 
-router.get('/sessions', requireAuth, (req, res) => {
-  const sessions = getDb().prepare(`
-    SELECT id, created_at, expires_at, ip_address, user_agent,
-           (id = ?) as is_current
-    FROM   sessions
-    WHERE  user_id = ? AND expires_at > datetime('now')
-    ORDER  BY created_at DESC
-  `).all(req.sessionId, req.user.id);
-
-  return res.json({ sessions });
+  return res.json({
+    sessions: sessions.map((session) => ({
+      id: session.id,
+      created_at: session.createdAt,
+      expires_at: session.expiresAt,
+      ip_address: session.ipAddress,
+      user_agent: session.userAgent,
+      is_current: session.id === req.sessionId ? 1 : 0,
+    })),
+  });
 });
-
-// ─── POST /forgot-password ────────────────────────────────────────────────────
 
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email is required' });
 
-  const db   = getDb();
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email.toLowerCase().trim());
+  const user = await prisma.user.findUnique({
+    where: { email: email.toLowerCase().trim() },
+  });
 
   if (user) {
-    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(user.id);
+    await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
 
     const resetToken = uuidv4();
-    db.prepare(`
-      INSERT INTO password_reset_tokens (id, user_id, token, expires_at)
-      VALUES (?, ?, ?, ?)
-    `).run(uuidv4(), user.id, resetToken, resetTokenExpiry());
+    await prisma.passwordResetToken.create({
+      data: {
+        id: uuidv4(),
+        userId: user.id,
+        token: resetToken,
+        expiresAt: resetTokenExpiry(),
+      },
+    });
 
     try {
       await sendPasswordResetEmail(user.email, user.name, resetToken);
@@ -162,8 +185,6 @@ router.post('/forgot-password', async (req, res) => {
   });
 });
 
-// ─── POST /reset-password ─────────────────────────────────────────────────────
-
 router.post('/reset-password', async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) {
@@ -173,24 +194,34 @@ router.post('/reset-password', async (req, res) => {
   const pwErr = validatePassword(password);
   if (pwErr) return res.status(400).json({ error: pwErr });
 
-  const db = getDb();
-  const record = db.prepare(`
-    SELECT * FROM password_reset_tokens
-    WHERE  token = ? AND used = 0 AND expires_at > datetime('now')
-  `).get(token);
+  const record = await prisma.passwordResetToken.findFirst({
+    where: {
+      token,
+      used: false,
+      expiresAt: { gt: toSqliteDate(Date.now()) },
+    },
+  });
 
   if (!record) return res.status(400).json({ error: 'Invalid or expired reset token' });
 
   const hash = await bcrypt.hash(password, config.bcrypt.saltRounds);
 
-  db.transaction(() => {
-    db.prepare(`UPDATE users SET password = ?, updated_at = datetime('now') WHERE id = ?`)
-      .run(hash, record.user_id);
-    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?')
-      .run(record.id);
-    db.prepare('DELETE FROM sessions WHERE user_id = ?')
-      .run(record.user_id);
-  })();
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.userId },
+      data: {
+        password: hash,
+        updatedAt: toSqliteDate(Date.now()),
+      },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: record.id },
+      data: { used: true },
+    }),
+    prisma.session.deleteMany({
+      where: { userId: record.userId },
+    }),
+  ]);
 
   return res.json({ message: 'Password reset successfully. Please log in with your new password.' });
 });

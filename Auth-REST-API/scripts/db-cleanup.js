@@ -5,18 +5,32 @@
 // Safe to run at any time; schedule with cron in production.
 
 require('dotenv').config();
-const { getDb } = require('../src/db/database');
+const { prisma } = require('../src/db/prisma');
+const { toSqliteDate } = require('../src/utils/dates');
 
-const db = getDb();
+async function main() {
+  const now = toSqliteDate(Date.now());
 
-const deletedSessions = db.prepare(
-  `DELETE FROM sessions WHERE expires_at <= datetime('now')`
-).run().changes;
+  const deletedSessions = await prisma.session.deleteMany({
+    where: { expiresAt: { lte: now } },
+  });
 
-const deletedTokens = db.prepare(
-  `DELETE FROM password_reset_tokens WHERE used = 1 OR expires_at <= datetime('now')`
-).run().changes;
+  const deletedTokens = await prisma.passwordResetToken.deleteMany({
+    where: {
+      OR: [{ used: true }, { expiresAt: { lte: now } }],
+    },
+  });
 
-console.log('🧹 Database cleanup complete.');
-console.log(`   Expired sessions removed      : ${deletedSessions}`);
-console.log(`   Expired/used reset tokens removed: ${deletedTokens}`);
+  console.log('Database cleanup complete.');
+  console.log(`   Expired sessions removed      : ${deletedSessions.count}`);
+  console.log(`   Expired/used reset tokens removed: ${deletedTokens.count}`);
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

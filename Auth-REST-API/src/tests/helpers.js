@@ -1,30 +1,24 @@
 "use strict";
 
-const { getDb } = require("../db/database");
+const { prisma } = require("../db/prisma");
 
-function resetDb() {
-  const db = getDb();
-  db.prepare("DELETE FROM users").run();
-  db.prepare("DELETE FROM sqlite_sequence WHERE name = ?").run("Todo");
+async function resetDb() {
+  await prisma.user.deleteMany();
 }
 
 function getUser(email) {
-  const db = getDb();
-  return db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+  return prisma.user.findUnique({ where: { email } });
 }
 
 function getSession(token) {
-  const db = getDb();
-  return db.prepare("SELECT * FROM sessions WHERE token = ?").get(token);
+  return prisma.session.findUnique({ where: { token } });
 }
 
 function getResetToken(userId) {
-  const db = getDb();
-  return db
-    .prepare(
-      "SELECT * FROM password_reset_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-    )
-    .get(userId);
+  return prisma.passwordResetToken.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
 }
 
 module.exports = {

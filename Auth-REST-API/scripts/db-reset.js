@@ -7,17 +7,23 @@ require('dotenv').config();
 const readline = require('readline');
 const path = require('path');
 const fs   = require('fs');
+const { getDatabaseUrl } = require('../src/db/prisma');
 
-const dbPath = process.env.DB_PATH || './data/auth.db';
+function resolveDbPathFromUrl() {
+  const url = getDatabaseUrl();
+  if (!url.startsWith('file:')) {
+    throw new Error('db:reset supports SQLite file URLs only');
+  }
+  return url.replace(/^file:/, '');
+}
 
 function reset() {
-  // Delete the DB file entirely and let getDb() recreate it
+  const dbPath = resolveDbPathFromUrl();
+  // Delete the DB file; run `npm run db:init` (prisma db push) to recreate schema.
   if (fs.existsSync(dbPath)) {
     fs.unlinkSync(dbPath);
     console.log('🗑  Deleted existing database:', dbPath);
   }
-  const { getDb } = require('../src/db/database');
-  getDb();
   console.log('✅ Database reset and re-initialized.');
   console.log('   Path:', path.resolve(dbPath));
 }

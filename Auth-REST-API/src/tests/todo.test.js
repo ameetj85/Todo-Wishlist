@@ -1,6 +1,6 @@
 "use strict";
 
-process.env.DB_PATH = ":memory:";
+process.env.DATABASE_URL = "file:./data/test.db";
 process.env.SESSION_EXPIRY_HOURS = "24";
 process.env.RESET_TOKEN_EXPIRY_MINUTES = "60";
 process.env.BCRYPT_ROUNDS = "4";

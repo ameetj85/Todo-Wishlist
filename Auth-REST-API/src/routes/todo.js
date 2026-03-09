@@ -1,8 +1,9 @@
 "use strict";
 
 const express = require("express");
-const { getDb } = require("../db/database");
+const { prisma } = require("../db/prisma");
 const { requireAuth } = require("../middleware/auth");
+const { toSqliteDateOnly } = require("../utils/dates");
 
 const router = express.Router();
 
@@ -10,12 +11,12 @@ router.use(requireAuth);
 
 function toTodoResponse(row) {
   return {
-    todo_id: row.todo_id,
-    user_id: row.user_id,
+    todo_id: row.todoId,
+    user_id: row.userId,
     name: row.name,
     description: row.description,
-    due_date: row.due_date,
-    created_date: row.created_date,
+    due_date: row.dueDate,
+    created_date: row.createdDate,
     category: row.category,
     completed: !!row.completed,
   };
@@ -30,7 +31,7 @@ function isValidDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-router.post("/", (req, res) => {
+router.post("/", async (req, res) => {
   const { name, description, due_date, category, completed } = req.body;
 
   if (!name || typeof name !== "string" || !name.trim()) {
@@ -55,86 +56,67 @@ router.post("/", (req, res) => {
     return res.status(400).json({ error: "completed must be a boolean" });
   }
 
-  const db = getDb();
-  const result = db
-    .prepare(
-      `
-    INSERT INTO Todo (user_id, name, description, due_date, category, completed)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `,
-    )
-    .run(
-      req.user.id,
-      name.trim(),
-      description.trim(),
-      due_date ?? null,
-      category.trim(),
-      completed ? 1 : 0,
-    );
-
-  const todo = db
-    .prepare("SELECT * FROM Todo WHERE todo_id = ? AND user_id = ?")
-    .get(result.lastInsertRowid, req.user.id);
+  const todo = await prisma.todo.create({
+    data: {
+      userId: req.user.id,
+      name: name.trim(),
+      description: description.trim(),
+      dueDate: due_date ?? null,
+      category: category.trim(),
+      completed: !!completed,
+      createdDate: toSqliteDateOnly(Date.now()),
+    },
+  });
 
   return res.status(201).json({ todo: toTodoResponse(todo) });
 });
 
-router.get("/", (req, res) => {
-  const todos = getDb()
-    .prepare(
-      `
-    SELECT *
-    FROM Todo
-    WHERE user_id = ?
-    ORDER BY created_date DESC, todo_id DESC
-  `,
-    )
-    .all(req.user.id);
+router.get("/", async (req, res) => {
+  const todos = await prisma.todo.findMany({
+    where: { userId: req.user.id },
+    orderBy: [{ createdDate: "desc" }, { todoId: "desc" }],
+  });
 
   return res.json({ todos: todos.map(toTodoResponse) });
 });
 
-router.get("/:todoId", (req, res) => {
+router.get("/:todoId", async (req, res) => {
   const todoId = parseTodoId(req.params.todoId);
   if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
 
-  const todo = getDb()
-    .prepare("SELECT * FROM Todo WHERE todo_id = ? AND user_id = ?")
-    .get(todoId, req.user.id);
+  const todo = await prisma.todo.findFirst({
+    where: { todoId, userId: req.user.id },
+  });
 
   if (!todo) return res.status(404).json({ error: "Todo not found" });
   return res.json({ todo: toTodoResponse(todo) });
 });
 
-router.put("/", (req, res) => {
+router.put("/", async (req, res) => {
   const todoId = parseTodoId(req.body.todo_id);
   if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
 
   const { name, description, due_date, category, completed } = req.body;
-  const updates = [];
-  const values = [];
+  const data = {};
 
   if (name !== undefined) {
     if (typeof name !== "string" || !name.trim())
       return res.status(400).json({ error: "name must be a non-empty string" });
-    updates.push("name = ?");
-    values.push(name.trim());
+    data.name = name.trim();
   }
   if (description !== undefined) {
     if (typeof description !== "string" || !description.trim())
       return res
         .status(400)
         .json({ error: "description must be a non-empty string" });
-    updates.push("description = ?");
-    values.push(description.trim());
+    data.description = description.trim();
   }
   if (category !== undefined) {
     if (typeof category !== "string" || !category.trim())
       return res
         .status(400)
         .json({ error: "category must be a non-empty string" });
-    updates.push("category = ?");
-    values.push(category.trim());
+    data.category = category.trim();
   }
   if (due_date !== undefined) {
     if (
@@ -145,52 +127,44 @@ router.put("/", (req, res) => {
         .status(400)
         .json({ error: "due_date must be null or YYYY-MM-DD format" });
     }
-    updates.push("due_date = ?");
-    values.push(due_date);
+    data.dueDate = due_date;
   }
   if (completed !== undefined) {
     if (typeof completed !== "boolean")
       return res.status(400).json({ error: "completed must be a boolean" });
-    updates.push("completed = ?");
-    values.push(completed ? 1 : 0);
+    data.completed = completed;
   }
 
-  if (updates.length === 0) {
+  if (Object.keys(data).length === 0) {
     return res
       .status(400)
       .json({ error: "At least one updatable field is required" });
   }
 
-  const db = getDb();
-  const result = db
-    .prepare(
-      `
-    UPDATE Todo
-    SET ${updates.join(", ")}
-    WHERE todo_id = ? AND user_id = ?
-  `,
-    )
-    .run(...values, todoId, req.user.id);
+  const result = await prisma.todo.updateMany({
+    where: { todoId, userId: req.user.id },
+    data,
+  });
 
-  if (result.changes === 0)
+  if (result.count === 0)
     return res.status(404).json({ error: "Todo not found" });
 
-  const todo = db
-    .prepare("SELECT * FROM Todo WHERE todo_id = ? AND user_id = ?")
-    .get(todoId, req.user.id);
+  const todo = await prisma.todo.findFirst({
+    where: { todoId, userId: req.user.id },
+  });
 
   return res.json({ todo: toTodoResponse(todo) });
 });
 
-router.delete("/:todoId", (req, res) => {
+router.delete("/:todoId", async (req, res) => {
   const todoId = parseTodoId(req.params.todoId);
   if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
 
-  const result = getDb()
-    .prepare("DELETE FROM Todo WHERE todo_id = ? AND user_id = ?")
-    .run(todoId, req.user.id);
+  const result = await prisma.todo.deleteMany({
+    where: { todoId, userId: req.user.id },
+  });
 
-  if (result.changes === 0)
+  if (result.count === 0)
     return res.status(404).json({ error: "Todo not found" });
   return res.json({ message: "Todo deleted successfully" });
 });

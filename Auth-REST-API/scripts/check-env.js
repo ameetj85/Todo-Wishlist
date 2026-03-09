@@ -17,6 +17,7 @@ const OPTIONAL = [
   { key: 'PORT',                       default: '3000' },
   { key: 'NODE_ENV',                   default: 'development' },
   { key: 'SESSION_EXPIRY_HOURS',       default: '24' },
+  { key: 'DATABASE_URL',               default: '(derived from DB_PATH when omitted)' },
   { key: 'DB_PATH',                    default: './data/auth.db' },
   { key: 'SMTP_PORT',                  default: '587' },
   { key: 'SMTP_SECURE',                default: 'false' },

@@ -6,7 +6,8 @@
 require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const { v4: uuidv4 } = require("uuid");
-const { getDb } = require("../src/db/database");
+const { prisma } = require("../src/db/prisma");
+const { toSqliteDateOnly } = require("../src/utils/dates");
 const config = require("../src/config");
 
 const SEED_USERS = [
@@ -83,17 +84,12 @@ function randomDueDateOrNull() {
   return now.toISOString().slice(0, 10);
 }
 
-function seedTodos(db) {
-  const users = db.prepare("SELECT id, name FROM users").all();
+async function seedTodos() {
+  const users = await prisma.user.findMany({ select: { id: true, name: true } });
   if (users.length === 0) {
-    console.log("   ⏭  Skipped todo seeding (no users found)");
+    console.log("   Skipped todo seeding (no users found)");
     return;
   }
-
-  const insertTodo = db.prepare(`
-    INSERT INTO Todo (user_id, name, description, due_date, category, completed)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `);
 
   let inserted = 0;
   for (const user of users) {
@@ -103,39 +99,32 @@ function seedTodos(db) {
       const description = `${pickRandom(TODO_DESCRIPTIONS)} for ${user.name}`;
       const dueDate = randomDueDateOrNull();
       const category = pickRandom(TODO_CATEGORIES);
-      const completed = Math.random() < 0.25 ? 1 : 0;
-      insertTodo.run(user.id, name, description, dueDate, category, completed);
+      const completed = Math.random() < 0.25;
+
+      await prisma.todo.create({
+        data: {
+          userId: user.id,
+          name,
+          description,
+          dueDate,
+          category,
+          completed,
+          createdDate: toSqliteDateOnly(Date.now()),
+        },
+      });
       inserted += 1;
     }
   }
 
-  console.log(
-    `   ✅ Inserted ${inserted} todo items across ${users.length} users`,
-  );
+  console.log(`   Inserted ${inserted} todo items across ${users.length} users`);
 }
 
-function seedWishlists(db) {
-  const users = db.prepare("SELECT id, name FROM users").all();
+async function seedWishlists() {
+  const users = await prisma.user.findMany({ select: { id: true, name: true } });
   if (users.length === 0) {
-    console.log("   ⏭  Skipped wishlist seeding (no users found)");
+    console.log("   Skipped wishlist seeding (no users found)");
     return;
   }
-
-  const insertWishlist = db.prepare(`
-    INSERT INTO wishlist (
-      userid,
-      title,
-      description,
-      url,
-      item_image,
-      price,
-      priority,
-      quantity,
-      purchased,
-      sequence
-    )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
 
   let inserted = 0;
   for (const user of users) {
@@ -145,65 +134,77 @@ function seedWishlists(db) {
       const description = `${pickRandom(WISHLIST_DESCRIPTIONS)} for ${user.name}`;
       const url = pickRandom(WISHLIST_URLS);
       const price = Number((Math.random() * 500 + 10).toFixed(2));
-      const priority = Math.floor(Math.random() * 3); // 0,1,2
+      const priority = Math.floor(Math.random() * 3);
       const quantity = Math.floor(Math.random() * 3) + 1;
-      const purchased = Math.random() < 0.2 ? 1 : 0;
+      const purchased = Math.random() < 0.2;
       const sequence = i + 1;
 
-      insertWishlist.run(
-        user.id,
-        title,
-        description,
-        url,
-        null,
-        price,
-        priority,
-        quantity,
-        purchased,
-        sequence,
-      );
+      await prisma.wishlistItem.create({
+        data: {
+          userId: user.id,
+          title,
+          description,
+          url,
+          itemImage: null,
+          price,
+          priority,
+          quantity,
+          purchased,
+          sequence,
+          createdDate: toSqliteDateOnly(Date.now()),
+        },
+      });
       inserted += 1;
     }
   }
 
-  console.log(
-    `   ✅ Inserted ${inserted} wishlist items across ${users.length} users`,
-  );
+  console.log(`   Inserted ${inserted} wishlist items across ${users.length} users`);
 }
 
 async function seed() {
-  const db = getDb();
-
-  console.log("🌱 Seeding database with sample users...\n");
+  console.log("Seeding database with sample users...\n");
 
   for (const u of SEED_USERS) {
-    const existing = db
-      .prepare("SELECT id FROM users WHERE email = ?")
-      .get(u.email);
+    const existing = await prisma.user.findUnique({
+      where: { email: u.email },
+      select: { id: true },
+    });
+
     if (existing) {
-      console.log(`   ⏭  Skipped (already exists): ${u.email}`);
+      console.log(`   Skipped (already exists): ${u.email}`);
       continue;
     }
 
     const hash = await bcrypt.hash(u.password, config.bcrypt.saltRounds);
     const id = uuidv4();
-    db.prepare(
-      "INSERT INTO users (id, email, password, name, is_verified) VALUES (?, ?, ?, ?, 1)",
-    ).run(id, u.email, hash, u.name);
 
-    console.log(`   ✅ Created: ${u.email}  (password: ${u.password})`);
+    await prisma.user.create({
+      data: {
+        id,
+        email: u.email,
+        password: hash,
+        name: u.name,
+        isVerified: true,
+      },
+    });
+
+    console.log(`   Created: ${u.email}  (password: ${u.password})`);
   }
 
-  console.log("\n📝 Seeding todos for users...\n");
-  seedTodos(db);
+  console.log("\nSeeding todos for users...\n");
+  await seedTodos();
 
-  console.log("\n🎁 Seeding wishlists for users...\n");
-  seedWishlists(db);
+  console.log("\nSeeding wishlists for users...\n");
+  await seedWishlists();
 
   console.log("\nDone.");
 }
 
-seed().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+seed()
+  .catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

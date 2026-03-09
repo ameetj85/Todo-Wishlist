@@ -1,9 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PublicWishlistItemsList } from "@/components/public-wishlist-items-list";
 
 type WishlistItem = {
   item_id: number;
   title: string;
   description: string | null;
+  url: string | null;
   price: number;
   quantity: number;
   priority: number;
@@ -58,12 +60,6 @@ async function fetchPublicWishlist(
   }
 }
 
-function getPriorityLabel(priority: number) {
-  if (priority === 0) return "High";
-  if (priority === 1) return "Medium";
-  return "Low";
-}
-
 export default async function PublicWishlistPage({
   searchParams,
 }: {
@@ -105,37 +101,27 @@ export default async function PublicWishlistPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col gap-4 px-6 py-12">
-      <Card className="border-blue-200/70 shadow-sm">
-        <CardHeader>
-          <CardTitle>{result.user?.name ?? "User"}&apos;s Wishlist</CardTitle>
+    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl flex-col gap-5 px-4 py-10 sm:px-6">
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="space-y-2 pb-3">
+          <CardTitle className="text-2xl font-semibold text-slate-900">
+            {result.user?.name ?? "User"}&apos;s Wishlist
+          </CardTitle>
+          <p className="text-sm text-slate-600">Viewing wishlist for: {normalizedEmail}</p>
         </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          Viewing wishlist for: {normalizedEmail}
+        <CardContent className="border-t border-slate-100 pt-3 text-sm text-slate-600">
+          {result.items.length} item{result.items.length === 1 ? "" : "s"}
         </CardContent>
       </Card>
 
       {result.items.length === 0 ? (
-        <Card className="border-blue-200/70 shadow-sm">
-          <CardContent className="py-6 text-sm text-muted-foreground">
+        <Card className="border-slate-200 shadow-sm">
+          <CardContent className="py-6 text-sm text-slate-600">
             This wishlist has no items yet.
           </CardContent>
         </Card>
       ) : (
-        result.items.map((item) => (
-          <Card key={item.item_id} className="border-blue-200/70 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">{item.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>{item.description ?? "No description provided."}</p>
-              <p>Priority: {getPriorityLabel(item.priority)}</p>
-              <p>Price: ${item.price.toFixed(2)}</p>
-              <p>Quantity: {item.quantity}</p>
-              <p>Status: {item.purchased ? "Purchased" : "Not purchased"}</p>
-            </CardContent>
-          </Card>
-        ))
+        <PublicWishlistItemsList email={normalizedEmail} items={result.items} />
       )}
     </main>
   );

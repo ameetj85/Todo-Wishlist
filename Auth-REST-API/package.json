@@ -9,15 +9,16 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test src/tests/**/*.test.js",
-    "test:watch": "node --test --watch src/tests/**/*.test.js",
-    "test:coverage": "node --experimental-test-coverage --test src/tests/**/*.test.js",
+    "test": "DATABASE_URL=file:./data/test.db prisma db push --skip-generate && node --test --test-concurrency=1 src/tests/**/*.test.js",
+    "test:watch": "DATABASE_URL=file:./data/test.db prisma db push --skip-generate && node --test --test-concurrency=1 --watch src/tests/**/*.test.js",
+    "test:coverage": "DATABASE_URL=file:./data/test.db prisma db push --skip-generate && node --experimental-test-coverage --test --test-concurrency=1 src/tests/**/*.test.js",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
-    "db:init": "node scripts/db-init.js",
-    "db:reset": "node scripts/db-reset.js",
+    "db:init": "prisma db push",
+    "db:reset": "prisma db push --force-reset",
     "db:seed": "node scripts/db-seed.js",
     "db:cleanup": "node scripts/db-cleanup.js",
+    "prisma:generate": "prisma generate",
     "check:env": "node scripts/check-env.js"
   },
   "keywords": [
@@ -31,8 +32,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@prisma/client": "^6.5.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.6.2",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.0",
@@ -41,6 +42,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "eslint": "^10.0.3"
+    "eslint": "^10.0.3",
+    "prisma": "^6.5.0"
   }
 }

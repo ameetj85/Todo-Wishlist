@@ -2,6 +2,15 @@
 
 require('dotenv').config();
 
+function resolveDatabaseUrl() {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  const dbPath = process.env.DB_PATH || './data/auth.db';
+  if (dbPath === ':memory:') return 'file:./data/test.db';
+
+  return dbPath.startsWith('file:') ? dbPath : `file:${dbPath}`;
+}
+
 const config = {
   server: {
     port: parseInt(process.env.PORT || '3000', 10),
@@ -11,6 +20,7 @@ const config = {
 
   db: {
     path: process.env.DB_PATH || './data/auth.db',
+    url: resolveDatabaseUrl(),
   },
 
   session: {

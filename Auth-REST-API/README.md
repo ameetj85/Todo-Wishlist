@@ -1,6 +1,6 @@
 # Auth API
 
-A production-ready REST API authentication system built with **Node.js**, **Express**, and **SQLite** (via `better-sqlite3`). No external auth services required — sessions are stored on disk.
+A production-ready REST API authentication system built with **Node.js**, **Express**, **Prisma**, and **SQLite**. No external auth services required — sessions are stored on disk.
 
 ## Features
 
@@ -68,7 +68,7 @@ auth-api/
 │   ├── config/
 │   │   └── index.js             # Central config (reads from env)
 │   ├── db/
-│   │   └── database.js          # SQLite init & schema
+│   │   └── prisma.js            # Prisma client + DB URL resolution
 │   ├── middleware/
 │   │   └── auth.js              # requireAuth middleware
 │   ├── routes/
@@ -77,6 +77,8 @@ auth-api/
 │   │   └── email.js             # Nodemailer password reset emails
 │   └── validators/
 │       └── index.js             # Input validation functions
+├── prisma/
+│   └── schema.prisma            # Prisma schema
 │
 ├── scripts/
 │   ├── db-init.js               # npm run db:init

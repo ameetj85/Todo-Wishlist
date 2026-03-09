@@ -1,7 +1,6 @@
 "use strict";
 
-// Use an in-memory DB for all auth tests
-process.env.DB_PATH = ":memory:";
+process.env.DATABASE_URL = "file:./data/test.db";
 process.env.SESSION_EXPIRY_HOURS = "24";
 process.env.RESET_TOKEN_EXPIRY_MINUTES = "60";
 process.env.BCRYPT_ROUNDS = "4"; // Low rounds for speed in tests
@@ -174,13 +173,13 @@ describe("POST /api/auth/logout", () => {
   it("invalidates the session token", async () => {
     const signup = await request(app, "POST", "/api/auth/signup", VALID_USER);
     const token = signup.body.token;
-    assert.ok(getSession(token));
+    assert.ok(await getSession(token));
 
     const logout = await request(app, "POST", "/api/auth/logout", null, {
       Authorization: `Bearer ${token}`,
     });
     assert.equal(logout.status, 200);
-    assert.equal(getSession(token), undefined);
+    assert.equal(await getSession(token), null);
 
     // Token should no longer work
     const me = await request(app, "GET", "/api/auth/me", null, {
@@ -228,13 +227,13 @@ describe("POST /api/auth/forgot-password", () => {
 
   it("creates a reset token for existing users", async () => {
     await request(app, "POST", "/api/auth/signup", VALID_USER);
-    const user = getUser(VALID_USER.email);
+    const user = await getUser(VALID_USER.email);
     await request(app, "POST", "/api/auth/forgot-password", {
       email: VALID_USER.email,
     });
-    const token = getResetToken(user.id);
+    const token = await getResetToken(user.id);
     assert.ok(token);
-    assert.equal(token.used, 0);
+    assert.equal(token.used, false);
   });
 
   it("rejects missing email", async () => {
@@ -248,11 +247,11 @@ describe("POST /api/auth/forgot-password", () => {
 describe("POST /api/auth/reset-password", () => {
   async function setupReset() {
     await request(app, "POST", "/api/auth/signup", VALID_USER);
-    const user = getUser(VALID_USER.email);
+    const user = await getUser(VALID_USER.email);
     await request(app, "POST", "/api/auth/forgot-password", {
       email: VALID_USER.email,
     });
-    const tokenRecord = getResetToken(user.id);
+    const tokenRecord = await getResetToken(user.id);
     return { user, resetToken: tokenRecord.token };
   }
 
