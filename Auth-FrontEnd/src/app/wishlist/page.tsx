@@ -3,11 +3,71 @@ import { redirect } from "next/navigation";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { getAuthToken } from "@/lib/auth-cookie";
 import { getSessionData } from "@/lib/session";
+import { WishlistItemsList } from "@/components/wishlist-items-list";
+
+type WishlistItem = {
+  item_id: number;
+  title: string;
+  description: string | null;
+  url: string | null;
+  item_image: string | null;
+  price: number;
+  quantity: number;
+  priority: number;
+  purchased: boolean;
+  sequence: number;
+};
+
+type WishlistResponse = {
+  items: WishlistItem[];
+  error?: string;
+};
+
+function getApiBaseUrl() {
+  const value = process.env.AUTH_API_BASE_URL;
+
+  if (!value) {
+    throw new Error("Missing AUTH_API_BASE_URL environment variable.");
+  }
+
+  return value.replace(/\/$/, "");
+}
+
+async function fetchWishlist(token: string): Promise<WishlistResponse> {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/wishlist`, {
+      method: "GET",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const payload = (await response.json()) as WishlistResponse;
+
+    if (!response.ok) {
+      return {
+        items: [],
+        error: payload.error ?? "Unable to load wishlist",
+      };
+    }
+
+    return {
+      items: payload.items ?? [],
+    };
+  } catch {
+    return {
+      items: [],
+      error: "Unable to reach wishlist service",
+    };
+  }
+}
 
 export const dynamic = "force-dynamic";
 
@@ -18,23 +78,35 @@ export default async function WishlistPage() {
     redirect("/login?next=/wishlist");
   }
 
+  const token = await getAuthToken();
+
+  if (!token) {
+    redirect("/login?next=/wishlist");
+  }
+
+  const wishlist = await fetchWishlist(token);
+
   return (
-    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl flex-col items-center justify-center px-6 py-12">
-      <Card className="w-full border-blue-200/70 shadow-sm">
-        <CardHeader>
-          <CardTitle>Wishlist</CardTitle>
-          <CardDescription>
-            Save your future purchases and ideas in one organized place.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Keep track of products and plans you care about, then revisit them
-            anytime.
+    <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl flex-col gap-5 px-4 py-10 sm:px-6">
+      <Card className="border-slate-200 shadow-sm">
+        <CardHeader className="space-y-2 pb-3">
+          <CardTitle className="text-2xl font-semibold text-slate-900">Wishlist</CardTitle>
+          <p className="text-sm text-slate-600">
+            Manage your own wishlist items with quick edit/delete controls.
           </p>
-          <p>This page is now ready for your Wishlist management features.</p>
+        </CardHeader>
+        <CardContent className="border-t border-slate-100 pt-3 text-sm text-slate-600">
+          {wishlist.items.length} item{wishlist.items.length === 1 ? "" : "s"}
         </CardContent>
       </Card>
+
+      {wishlist.error ? (
+        <Card className="border-red-200 shadow-sm">
+          <CardContent className="py-6 text-sm text-red-700">{wishlist.error}</CardContent>
+        </Card>
+      ) : (
+        <WishlistItemsList initialItems={wishlist.items} />
+      )}
     </main>
   );
 }
