@@ -37,7 +37,10 @@ export default async function RootLayout({
         className={`${nunito.variable} ${jetBrainsMono.variable} antialiased`}
       >
         <ThemeProvider>
-          <AppNavbar isAuthenticated={session.isAuthenticated} />
+          <AppNavbar
+            isAuthenticated={session.isAuthenticated}
+            isAdmin={!!session.user?.isAdmin}
+          />
           {children}
         </ThemeProvider>
       </body>

@@ -13,6 +13,7 @@ model User {
   password           String
   name               String
   isVerified         Boolean              @default(false) @map("is_verified")
+  isAdmin            Boolean              @default(false) @map("is_admin")
   createdAt          String               @default(dbgenerated("(datetime('now'))")) @map("created_at")
   updatedAt          String               @default(dbgenerated("(datetime('now'))")) @map("updated_at")
   sessions           Session[]

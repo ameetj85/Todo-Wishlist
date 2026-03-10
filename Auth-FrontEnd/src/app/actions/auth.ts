@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import {
+  changePassword,
   forgotPassword,
   login,
   logout,
@@ -106,6 +107,34 @@ export async function resetPasswordAction(
   const password = String(formData.get("password") ?? "");
 
   const response = await resetPassword({ token, password });
+
+  if (!response.ok) {
+    return { error: response.error };
+  }
+
+  return { success: response.data.message };
+}
+
+export async function changePasswordAction(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+
+  const token = await getAuthToken();
+
+  if (!token) {
+    return { error: "You need to sign in again to change your password." };
+  }
+
+  const response = await changePassword(
+    {
+      current_password: currentPassword,
+      new_password: newPassword,
+    },
+    token,
+  );
 
   if (!response.ok) {
     return { error: response.error };

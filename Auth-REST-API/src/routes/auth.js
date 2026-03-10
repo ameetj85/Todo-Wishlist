@@ -226,4 +226,55 @@ router.post('/reset-password', async (req, res) => {
   return res.json({ message: 'Password reset successfully. Please log in with your new password.' });
 });
 
+router.post('/change-password', requireAuth, async (req, res) => {
+  const { current_password, new_password } = req.body;
+
+  if (!current_password || !new_password) {
+    return res.status(400).json({ error: 'current_password and new_password are required' });
+  }
+
+  const pwErr = validatePassword(new_password);
+  if (pwErr) return res.status(400).json({ error: pwErr });
+
+  const user = await prisma.user.findUnique({
+    where: { id: req.user.id },
+    select: { id: true, password: true },
+  });
+
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  const currentMatches = await bcrypt.compare(current_password, user.password);
+
+  if (!currentMatches) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+
+  const isSamePassword = await bcrypt.compare(new_password, user.password);
+  if (isSamePassword) {
+    return res.status(400).json({ error: 'New password must be different from current password' });
+  }
+
+  const hash = await bcrypt.hash(new_password, config.bcrypt.saltRounds);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        password: hash,
+        updatedAt: toSqliteDate(Date.now()),
+      },
+    }),
+    prisma.session.deleteMany({
+      where: {
+        userId: req.user.id,
+        id: { not: req.sessionId },
+      },
+    }),
+  ]);
+
+  return res.json({ message: 'Password changed successfully' });
+});
+
 module.exports = router;

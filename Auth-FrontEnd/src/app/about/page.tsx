@@ -53,6 +53,11 @@ export default async function AboutPage() {
               <span className="font-medium">Verified:</span>{" "}
               {session.user.isVerified ? "Yes" : "No"}
             </p>
+            {session.user.isAdmin ? (
+              <p>
+                <span className="font-medium">Admin:</span> Yes
+              </p>
+            ) : null}
           </section>
 
           <section className="space-y-2 text-sm">

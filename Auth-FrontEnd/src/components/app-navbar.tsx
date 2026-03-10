@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 
@@ -13,12 +13,13 @@ import { cn } from "@/lib/utils";
 
 type AppNavbarProps = {
   isAuthenticated: boolean;
+  isAdmin: boolean;
 };
 
 const themeNavLinkClassName =
   "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground";
 
-export function AppNavbar({ isAuthenticated }: AppNavbarProps) {
+export function AppNavbar({ isAuthenticated, isAdmin }: AppNavbarProps) {
   const emailInputId = useId();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -27,6 +28,8 @@ export function AppNavbar({ isAuthenticated }: AppNavbarProps) {
   const [showValidationError, setShowValidationError] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [isLookingUpWishlist, setIsLookingUpWishlist] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
 
   const fromHero = searchParams.get("from") === "hero";
   const isHeroFlowChildRoute =
@@ -36,7 +39,37 @@ export function AppNavbar({ isAuthenticated }: AppNavbarProps) {
   const onTodoPage = pathname === "/todo";
   const onWishlistPage = pathname === "/wishlist";
   const onAboutPage = pathname === "/about";
+  const onChangePasswordPage = pathname === "/change-password";
+  const onAdminConsolePage = pathname === "/admin-console";
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress.trim());
+
+  useEffect(() => {
+    function onWindowClick(event: MouseEvent) {
+      const target = event.target as Node | null;
+
+      if (!target) {
+        return;
+      }
+
+      if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setIsProfileMenuOpen(false);
+      }
+    }
+
+    function onEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsProfileMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("click", onWindowClick);
+    window.addEventListener("keydown", onEscape);
+
+    return () => {
+      window.removeEventListener("click", onWindowClick);
+      window.removeEventListener("keydown", onEscape);
+    };
+  }, []);
 
   function openWishlistModal() {
     setIsWishlistModalOpen(true);
@@ -150,31 +183,81 @@ export function AppNavbar({ isAuthenticated }: AppNavbarProps) {
                     Wishlist
                   </NavbarLink>
                 ) : null}
-                {!onAboutPage ? (
-                  <NavbarLink href="/about" className={themeNavLinkClassName}>
-                    About
-                  </NavbarLink>
-                ) : null}
               </>
             ) : null}
           </div>
 
           <div className="flex items-center justify-self-end gap-2">
-            {isAuthenticated ? (
-              <a
-                href="/logout"
-                className={cn(NAVBAR_LINK_CLASS_NAME, themeNavLinkClassName)}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isProfileMenuOpen}
+                aria-label="Open profile menu"
+                onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background hover:bg-accent"
               >
-                Sign Out
-              </a>
-            ) : !onLoginPage ? (
-              <NavbarLink
-                href={pathname === "/" ? "/login?from=hero" : "/login"}
-                className={themeNavLinkClassName}
-              >
-                Sign In
-              </NavbarLink>
-            ) : null}
+                <Image
+                  src="/person-avatar.svg"
+                  alt="Profile menu"
+                  width={28}
+                  height={28}
+                  className="rounded-full"
+                />
+              </button>
+
+              {isProfileMenuOpen ? (
+                <div className="absolute right-0 z-50 mt-2 min-w-48 rounded-lg border border-border bg-background p-1 shadow-lg">
+                  {!onAboutPage ? (
+                    <a
+                      href="/about"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    >
+                      About
+                    </a>
+                  ) : null}
+
+                  {isAuthenticated && !onChangePasswordPage ? (
+                    <a
+                      href="/change-password"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    >
+                      Change Password
+                    </a>
+                  ) : null}
+
+                  {isAuthenticated && isAdmin && !onAdminConsolePage ? (
+                    <a
+                      href="/admin-console"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    >
+                      Admin Console
+                    </a>
+                  ) : null}
+
+                  {isAuthenticated ? (
+                    <a
+                      href="/logout"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    >
+                      Sign Out
+                    </a>
+                  ) : !onLoginPage ? (
+                    <a
+                      href={pathname === "/" ? "/login?from=hero" : "/login"}
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsProfileMenuOpen(false)}
+                    >
+                      Sign In
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
 
             <ThemeToggle />
           </div>

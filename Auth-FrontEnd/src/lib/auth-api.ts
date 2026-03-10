@@ -19,6 +19,7 @@ export type AuthUser = {
   email: string;
   name: string;
   isVerified?: boolean;
+  isAdmin?: boolean;
 };
 
 export type AuthSession = {
@@ -152,6 +153,20 @@ export function resetPassword(payload: { token: string; password: string }) {
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export function changePassword(
+  payload: { current_password: string; new_password: string },
+  token: string,
+) {
+  return request<{ message: string }>(
+    "/change-password",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    token,
+  );
 }
 
 export function getMe(token: string) {

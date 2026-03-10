@@ -14,6 +14,7 @@ const SEED_USERS = [
   { email: "admin@example.com", name: "Admin User", password: "AdminPass1" },
   { email: "alice@example.com", name: "Alice Smith", password: "AlicePass1" },
   { email: "bob@example.com", name: "Bob Jones", password: "BobPass123" },
+  { email: "ameetj85@gmail.com", name: "Ameet Jayawant", password: "Welcome1*", isAdmin:true }
 ];
 
 const TODO_CATEGORIES = ["Work", "Personal", "Health", "Finance", "Learning"];

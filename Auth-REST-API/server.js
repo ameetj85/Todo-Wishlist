@@ -7,6 +7,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const config = require("./src/config");
 const authRoutes = require("./src/routes/auth");
+const adminRoutes = require("./src/routes/admin");
 const todoRoutes = require("./src/routes/todo");
 const wishlistRoutes = require("./src/routes/wishlist");
 
@@ -41,6 +42,7 @@ app.use("/api/auth/login", authLimiter);
 app.use("/api/auth/forgot-password", authLimiter);
 app.use("/api/auth/reset-password", authLimiter);
 app.use("/api/auth", authRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/todos", todoRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 

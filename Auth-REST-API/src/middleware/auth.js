@@ -23,7 +23,13 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: 'Invalid or expired session token' });
   }
 
-  req.user      = { id: session.user.id, email: session.user.email, name: session.user.name, isVerified: !!session.user.isVerified };
+  req.user      = {
+    id: session.user.id,
+    email: session.user.email,
+    name: session.user.name,
+    isVerified: !!session.user.isVerified,
+    isAdmin: !!session.user.isAdmin,
+  };
   req.sessionId = session.id;
   req.token     = token;
 
