@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import sharp from "sharp";
 
 type ExtractImageBody = {
   url?: string;
@@ -7,6 +8,34 @@ type ExtractImageBody = {
 function getFirstImageSource(html: string) {
   const imageTagMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
   return imageTagMatch?.[1] ?? null;
+}
+
+const MAX_IMAGE_BYTES = 200 * 1024;
+
+async function optimizeImageBuffer(inputBuffer: Buffer) {
+  let width = 800;
+  let quality = 82;
+  let attempts = 0;
+  let outputBuffer = inputBuffer;
+
+  // Iteratively reduce dimensions/quality until the payload is small enough.
+  while (attempts < 6) {
+    outputBuffer = await sharp(inputBuffer)
+      .rotate()
+      .resize({ width, withoutEnlargement: true })
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+
+    if (outputBuffer.byteLength <= MAX_IMAGE_BYTES) {
+      return outputBuffer;
+    }
+
+    width = Math.max(240, Math.floor(width * 0.8));
+    quality = Math.max(45, quality - 8);
+    attempts += 1;
+  }
+
+  return outputBuffer;
 }
 
 async function tryExtractFirstImageAsBase64(rawUrl: string) {
@@ -52,7 +81,8 @@ async function tryExtractFirstImageAsBase64(rawUrl: string) {
     }
 
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    return imageBuffer.toString("base64");
+    const optimizedBuffer = await optimizeImageBuffer(imageBuffer);
+    return optimizedBuffer.toString("base64");
   } catch {
     return null;
   }
