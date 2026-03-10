@@ -88,21 +88,21 @@ export default async function WishlistPage() {
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl flex-col gap-5 px-4 py-10 sm:px-6">
-      <Card className="border-slate-200 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="space-y-2 pb-3">
-          <CardTitle className="text-2xl font-semibold text-slate-900">Wishlist</CardTitle>
-          <p className="text-sm text-slate-600">
+          <CardTitle className="text-2xl font-semibold">Wishlist</CardTitle>
+          <p className="text-sm text-muted-foreground">
             Manage your own wishlist items with quick edit/delete controls.
           </p>
         </CardHeader>
-        <CardContent className="border-t border-slate-100 pt-3 text-sm text-slate-600">
+        <CardContent className="border-t border-border pt-3 text-sm text-muted-foreground">
           {wishlist.items.length} item{wishlist.items.length === 1 ? "" : "s"}
         </CardContent>
       </Card>
 
       {wishlist.error ? (
-        <Card className="border-red-200 shadow-sm">
-          <CardContent className="py-6 text-sm text-red-700">{wishlist.error}</CardContent>
+        <Card className="border-destructive/30 shadow-sm">
+          <CardContent className="py-6 text-sm text-destructive">{wishlist.error}</CardContent>
         </Card>
       ) : (
         <WishlistItemsList initialItems={wishlist.items} />

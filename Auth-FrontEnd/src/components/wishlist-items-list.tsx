@@ -62,6 +62,9 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [draggingItemId, setDraggingItemId] = useState<number | null>(null);
   const [isResequencing, setIsResequencing] = useState(false);
+  const [brokenImageItemIds, setBrokenImageItemIds] = useState<number[]>([]);
+  const [deleteConfirmItem, setDeleteConfirmItem] = useState<WishlistItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [itemImageBase64, setItemImageBase64] = useState<string | null>(null);
   const [isExtractingImage, setIsExtractingImage] = useState(false);
   const [urlImageUnavailable, setUrlImageUnavailable] = useState(false);
@@ -316,6 +319,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
   async function deleteItem(itemId: number) {
     setError(null);
+    setIsDeleting(true);
 
     const response = await fetch(`/api/wishlist/${itemId}`, {
       method: "DELETE",
@@ -329,12 +333,24 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
         | { error?: string }
         | null;
       setError(payload?.error ?? "Unable to delete wishlist item");
+      setIsDeleting(false);
       return;
     }
 
+    setDeleteConfirmItem(null);
     startTransition(() => {
       setItems((prev) => prev.filter((item) => item.item_id !== itemId));
     });
+
+    setIsDeleting(false);
+  }
+
+  function confirmAndDeleteItem() {
+    if (!deleteConfirmItem) {
+      return;
+    }
+
+    void deleteItem(deleteConfirmItem.item_id);
   }
 
   return (
@@ -355,21 +371,21 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
       </div>
 
       {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
         </div>
       ) : null}
 
       {sortedItems.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 shadow-sm">
+        <div className="rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground shadow-sm">
           This wishlist has no items yet.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-600">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="border-b border-border bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
             Drag and drop items to reorder the wishlist.
           </div>
-          <div className="hidden grid-cols-[96px_minmax(0,1fr)_110px_80px_190px] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold tracking-wide text-slate-600 uppercase md:grid">
+          <div className="hidden grid-cols-[96px_minmax(0,1fr)_110px_80px_190px] gap-4 border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase md:grid">
             <span>Item</span>
             <span>Details</span>
             <span>Price</span>
@@ -399,26 +415,31 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
                 setDraggingItemId(null);
               }}
-              className={`cursor-move border-b border-slate-100 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-gray-100" : "bg-white"} ${draggingItemId === item.item_id ? "opacity-60" : "opacity-100"}`}
+              className={`cursor-move border-b border-border/60 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-muted/40" : "bg-card"} ${draggingItemId === item.item_id ? "opacity-60" : "opacity-100"}`}
             >
               <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_190px] md:items-center md:gap-4">
-                {item.item_image ? (
+                {item.item_image && !brokenImageItemIds.includes(item.item_id) ? (
                   <Image
                     src={`data:image/*;base64,${item.item_image}`}
                     alt={item.title}
                     width={80}
                     height={80}
                     unoptimized
-                    className="h-20 w-20 rounded-lg border border-slate-200 bg-slate-50 object-cover"
+                    onError={() => {
+                      setBrokenImageItemIds((prev) =>
+                        prev.includes(item.item_id) ? prev : [...prev, item.item_id],
+                      );
+                    }}
+                    className="h-20 w-20 rounded-lg border border-border bg-muted/40 object-cover"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground">
                     <Package className="size-8" />
                   </div>
                 )}
 
                 <div className="min-w-0 space-y-2">
-                  <p className="truncate text-[15px] font-medium text-slate-900" title={item.title}>
+                  <p className="truncate text-[15px] font-medium text-foreground" title={item.title}>
                     {item.title}
                   </p>
 
@@ -429,11 +450,11 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                       {getPriorityLabel(item.priority)} Priority
                     </span>
 
-                    {item.purchased ? (
+                    {/* {item.purchased ? (
                       <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                         Purchased
                       </span>
-                    ) : null}
+                    ) : null} */}
                   </div>
 
                   {item.url ? (
@@ -441,19 +462,19 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                       href={normalizeItemUrl(item.url) ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-blue-700 hover:text-blue-800"
+                      className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-primary hover:text-primary/80"
                       title={item.url}
                     >
                       <span className="truncate">View Product</span>
                       <ExternalLink className="size-3.5 shrink-0" />
                     </a>
                   ) : (
-                    <p className="text-sm text-slate-500">No product link</p>
+                    <p className="text-sm text-muted-foreground">No product link</p>
                   )}
                 </div>
 
-                <div className="text-lg font-semibold text-slate-900">${item.price.toFixed(2)}</div>
-                <div className="text-sm font-medium text-slate-700">{item.quantity}</div>
+                <div className="text-lg font-semibold text-foreground">${item.price.toFixed(2)}</div>
+                <div className="text-sm font-medium text-muted-foreground">{item.quantity}</div>
 
                 <div className="flex items-center gap-2">
                   <Button
@@ -485,9 +506,9 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                     variant="destructive"
                     size="icon-sm"
                     className="h-8 w-auto px-3"
-                    disabled={isPending || item.purchased || isResequencing}
-                    title={item.purchased ? "Purchased items cannot be deleted" : "Delete item"}
-                    onClick={() => deleteItem(item.item_id)}
+                    disabled={isPending || isResequencing}
+                    title="Delete item"
+                    onClick={() => setDeleteConfirmItem(item)}
                   >
                     Delete
                   </Button>
@@ -500,11 +521,11 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
       {isAddDialogOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="w-full max-w-lg rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xl">
+            <h2 className="text-lg font-semibold text-foreground">
               {editingItemId === null ? "Add List Item" : "Edit List Item"}
             </h2>
-            <p className="mt-1 text-sm text-slate-600">
+            <p className="mt-1 text-sm text-muted-foreground">
               {editingItemId === null
                 ? "Enter the details for your new wishlist item."
                 : "Update the details for this wishlist item."}
@@ -546,7 +567,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                   placeholder="https://example.com/product"
                 />
                 {isExtractingImage ? (
-                  <p className="text-xs text-slate-500">Extracting image from URL...</p>
+                  <p className="text-xs text-muted-foreground">Extracting image from URL...</p>
                 ) : null}
               </div>
 
@@ -560,10 +581,10 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                       width={120}
                       height={120}
                       unoptimized
-                      className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                      className="h-24 w-24 rounded-lg border border-border object-cover"
                     />
                   ) : (
-                    <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
+                    <div className="flex h-24 w-24 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground">
                       <Package className="size-8" />
                     </div>
                   )}
@@ -592,7 +613,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                     >
                       Choose Image
                     </Button>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-muted-foreground">
                       {urlImageUnavailable
                         ? "No image found at URL. Choose one from disk."
                         : "You can replace the image by selecting a file."}
@@ -688,6 +709,45 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                   : editingItemId === null
                     ? "Save"
                     : "Update"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteConfirmItem ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 text-card-foreground shadow-xl">
+            <h2 className="text-lg font-semibold text-foreground">Delete Item</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {deleteConfirmItem.purchased
+                ? "Someone may have already bought this for you. Are you sure you want to delete this item anyway?"
+                : "Are you sure you want to delete this item?"}
+            </p>
+            <p className="mt-2 truncate text-sm font-medium text-foreground" title={deleteConfirmItem.title}>
+              {deleteConfirmItem.title}
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="h-8 w-auto px-3"
+                disabled={isDeleting}
+                onClick={() => setDeleteConfirmItem(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="icon-sm"
+                className="h-8 w-auto px-3"
+                disabled={isDeleting}
+                onClick={confirmAndDeleteItem}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
               </Button>
             </div>
           </div>

@@ -6,6 +6,7 @@ type WishlistItem = {
   title: string;
   description: string | null;
   url: string | null;
+  item_image: string | null;
   price: number;
   quantity: number;
   priority: number;

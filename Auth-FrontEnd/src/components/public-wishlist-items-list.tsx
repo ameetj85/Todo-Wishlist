@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { ExternalLink, Package } from "lucide-react";
+import Image from "next/image";
 
 import { Button } from "@/components/ui/button";
 import { PublicWishlistPurchasedButton } from "@/components/public-wishlist-purchased-button";
@@ -11,6 +12,7 @@ type WishlistItem = {
   title: string;
   description: string | null;
   url: string | null;
+  item_image: string | null;
   price: number;
   quantity: number;
   priority: number;
@@ -141,9 +143,20 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
               className={`border-b border-slate-100 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-gray-100" : "bg-white"}`}
             >
               <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_160px] md:items-center md:gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
-                  <Package className="size-8" />
-                </div>
+                {item.item_image ? (
+                  <Image
+                    src={`data:image/*;base64,${item.item_image}`}
+                    alt={item.title}
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="h-20 w-20 rounded-lg border border-slate-200 bg-slate-50 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
+                    <Package className="size-8" />
+                  </div>
+                )}
 
                 <div className="min-w-0 space-y-2">
                   <p className="truncate text-[15px] font-medium text-slate-900" title={item.title}>
@@ -169,7 +182,7 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
                       href={normalizeItemUrl(item.url) ?? undefined}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-blue-700 hover:text-blue-800"
+                      className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-primary hover:text-primary/80"
                       title={item.url}
                     >
                       <span className="truncate">View Product</span>
