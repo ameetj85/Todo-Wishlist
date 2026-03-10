@@ -15,8 +15,8 @@ const app = express();
 
 // ─── Security & Parsing ───────────────────────────────────────────────────────
 app.use(helmet());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "8mb" }));
+app.use(express.urlencoded({ extended: true, limit: "8mb" }));
 app.set("trust proxy", 1);
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
@@ -61,6 +61,10 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  if (err?.type === "entity.too.large") {
+    return res.status(413).json({ error: "Request payload too large (max 8MB)" });
+  }
+
   console.error(err.stack);
   res.status(500).json({
     error: config.server.isProd ? "Internal server error" : err.message,

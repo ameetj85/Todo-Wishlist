@@ -5,6 +5,11 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  createTodoAction,
+  deleteTodoAction,
+  updateTodoAction,
+} from "@/app/actions/todos";
 
 type TodoItem = {
   todo_id: number;
@@ -159,30 +164,29 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     const endpoint = isEdit ? `/api/todos/${activeTodoId}` : "/api/todos";
     const method = isEdit ? "PUT" : "POST";
 
-    const response = await fetch(endpoint, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        description,
-        category,
-        due_date: dueDate ? dueDate : null,
-        completed: todoForm.completed,
-      }),
-    });
+    const actionResult = isEdit
+      ? await updateTodoAction(activeTodoId, {
+          name,
+          description,
+          category,
+          due_date: dueDate ? dueDate : null,
+          completed: todoForm.completed,
+        })
+      : await createTodoAction({
+          name,
+          description,
+          category,
+          due_date: dueDate ? dueDate : null,
+          completed: todoForm.completed,
+        });
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? `Unable to ${isEdit ? "update" : "create"} todo`);
+    if (!actionResult.ok) {
+      setError(actionResult.error ?? `Unable to ${isEdit ? "update" : "create"} todo`);
       setIsSubmittingTodo(false);
       return;
     }
 
-    const payload = (await response.json()) as { todo: TodoItem };
+    const payload = { todo: actionResult.todo as TodoItem };
 
     startTransition(() => {
       if (isEdit) {
@@ -210,18 +214,10 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     setError(null);
     setIsDeleting(true);
 
-    const response = await fetch(`/api/todos/${deleteTodo.todo_id}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const result = await deleteTodoAction(deleteTodo.todo_id);
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "Unable to delete todo");
+    if (!result.ok) {
+      setError(result.error ?? "Unable to delete todo");
       setIsDeleting(false);
       return;
     }

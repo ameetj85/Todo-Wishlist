@@ -10,16 +10,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { lookupPublicWishlistByEmailAction } from "@/app/actions/wishlist";
 
 type AppNavbarProps = {
   isAuthenticated: boolean;
   isAdmin: boolean;
+  userName?: string | null;
 };
 
 const themeNavLinkClassName =
   "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground";
 
-export function AppNavbar({ isAuthenticated, isAdmin }: AppNavbarProps) {
+export function AppNavbar({ isAuthenticated, isAdmin, userName }: AppNavbarProps) {
   const emailInputId = useId();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -99,27 +101,14 @@ export function AppNavbar({ isAuthenticated, isAdmin }: AppNavbarProps) {
     setIsLookingUpWishlist(true);
 
     try {
-      const response = await fetch(
-        `/api/wishlist/public/by-email?email=${encodeURIComponent(normalizedEmail)}`,
-        {
-          method: "GET",
-          cache: "no-store",
-        },
-      );
+      const result = await lookupPublicWishlistByEmailAction(normalizedEmail);
 
-      const payload = (await response.json()) as {
-        found?: boolean;
-        error?: string;
-      };
-
-      if (!response.ok) {
-        setLookupError(
-          payload.error ?? "Unable to look up wishlist right now.",
-        );
+      if (!result.ok) {
+        setLookupError(result.error ?? "Unable to look up wishlist right now.");
         return;
       }
 
-      if (!payload.found) {
+      if (!result.found) {
         setLookupError("No wishlist match found for that email address.");
         return;
       }
@@ -145,7 +134,12 @@ export function AppNavbar({ isAuthenticated, isAdmin }: AppNavbarProps) {
               className="rounded-md"
               priority
             />
-            <span className="text-2xl font-bold">Your Smashing Apps</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">Your Smashing Apps</span>
+              {isAuthenticated && userName ? (
+                <span className="text-sm font-medium text-muted-foreground">({userName})</span>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex items-center justify-center gap-2">

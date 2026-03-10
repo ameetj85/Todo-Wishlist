@@ -112,7 +112,7 @@ export async function resetPasswordAction(
     return { error: response.error };
   }
 
-  return { success: response.data.message };
+  redirect("/login");
 }
 
 export async function changePasswordAction(

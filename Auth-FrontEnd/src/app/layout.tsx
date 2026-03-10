@@ -40,6 +40,7 @@ export default async function RootLayout({
           <AppNavbar
             isAuthenticated={session.isAuthenticated}
             isAdmin={!!session.user?.isAdmin}
+            userName={session.user?.name ?? null}
           />
           {children}
         </ThemeProvider>

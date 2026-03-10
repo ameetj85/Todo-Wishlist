@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { togglePublicWishlistPurchasedAction } from "@/app/actions/wishlist";
 
 type PublicWishlistPurchasedButtonProps = {
   email: string;
@@ -31,23 +32,14 @@ export function PublicWishlistPurchasedButton({
   async function togglePurchased() {
     setError(null);
 
-    const response = await fetch("/api/wishlist/public/purchased", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        item_id: itemId,
-        purchased: nextPurchasedValue,
-      }),
+    const result = await togglePublicWishlistPurchasedAction({
+      email,
+      item_id: itemId,
+      purchased: nextPurchasedValue,
     });
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "Unable to mark item as purchased");
+    if (!result.ok) {
+      setError(result.error ?? "Unable to mark item as purchased");
       return;
     }
 

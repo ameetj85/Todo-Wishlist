@@ -175,6 +175,7 @@ router.post('/forgot-password', async (req, res) => {
 
     try {
       await sendPasswordResetEmail(user.email, user.name, resetToken);
+      console.log(`Password reset email sent to ${user.email}`);
     } catch (e) {
       console.error('[email] Failed to send reset email:', e.message);
     }
@@ -183,6 +184,22 @@ router.post('/forgot-password', async (req, res) => {
   return res.json({
     message: 'If an account with that email exists, a password reset link has been sent',
   });
+});
+
+// Compatibility route: old reset links may target the API endpoint via GET.
+router.get('/reset-password', async (req, res) => {
+  const token = String(req.query.token ?? '').trim();
+  const appUrl = String(config.passwordReset.appUrl ?? '').replace(/\/$/, '');
+
+  if (!appUrl) {
+    return res.status(500).json({ error: 'Missing APP_URL configuration' });
+  }
+
+  if (!token) {
+    return res.redirect(`${appUrl}/reset-password`);
+  }
+
+  return res.redirect(`${appUrl}/reset-password?token=${encodeURIComponent(token)}`);
 });
 
 router.post('/reset-password', async (req, res) => {

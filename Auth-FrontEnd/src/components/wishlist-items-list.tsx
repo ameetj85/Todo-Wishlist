@@ -7,6 +7,12 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  createWishlistItemAction,
+  deleteWishlistItemAction,
+  extractWishlistImageAction,
+  updateWishlistItemAction,
+} from "@/app/actions/wishlist";
 
 type WishlistItem = {
   item_id: number;
@@ -101,13 +107,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
     const responses = await Promise.all(
       changedItems.map((item) =>
-        fetch(`/api/wishlist/${item.item_id}`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ sequence: item.sequence }),
-        }),
+        updateWishlistItemAction(item.item_id, { sequence: item.sequence }),
       ),
     );
 
@@ -181,21 +181,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
     setError(null);
     setIsExtractingImage(true);
 
-    const response = await fetch("/api/wishlist/extract-image", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ url }),
-    });
-
-    if (!response.ok) {
-      setUrlImageUnavailable(true);
-      setIsExtractingImage(false);
-      return;
-    }
-
-    const payload = (await response.json()) as { imageBase64?: string | null };
+    const payload = await extractWishlistImageAction(url);
 
     if (payload.imageBase64) {
       setItemImageBase64(payload.imageBase64);
@@ -266,9 +252,6 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
     setIsSaving(true);
 
     const isEditing = editingItemId !== null;
-    const endpoint = isEditing ? `/api/wishlist/${editingItemId}` : "/api/wishlist";
-    const method = isEditing ? "PUT" : "POST";
-
     const requestBody = {
       title,
       description: form.description.trim() || null,
@@ -281,24 +264,17 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
       sequence: isEditing ? editingItem?.sequence : undefined,
     };
 
-    const response = await fetch(endpoint, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(requestBody),
-    });
+    const result = isEditing
+      ? await updateWishlistItemAction(editingItemId, requestBody)
+      : await createWishlistItemAction(requestBody);
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "Unable to save wishlist item");
+    if (!result.ok) {
+      setError(result.error ?? "Unable to save wishlist item");
       setIsSaving(false);
       return;
     }
 
-    const payload = (await response.json()) as { item: WishlistItem };
+    const payload = { item: result.item as WishlistItem };
 
     startTransition(() => {
       setItems((prev) => {
@@ -321,18 +297,10 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
     setError(null);
     setIsDeleting(true);
 
-    const response = await fetch(`/api/wishlist/${itemId}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+    const result = await deleteWishlistItemAction(itemId);
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string }
-        | null;
-      setError(payload?.error ?? "Unable to delete wishlist item");
+    if (!result.ok) {
+      setError(result.error ?? "Unable to delete wishlist item");
       setIsDeleting(false);
       return;
     }
@@ -546,12 +514,14 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
               <div className="space-y-1">
                 <Label htmlFor="wishlist-description">Description</Label>
-                <Input
+                <textarea
                   id="wishlist-description"
                   value={form.description}
                   onChange={(event) =>
                     setForm((prev) => ({ ...prev, description: event.target.value }))
                   }
+                  rows={3}
+                  className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:bg-input/30 dark:disabled:bg-input/80 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40"
                   placeholder="Optional description"
                 />
               </div>
