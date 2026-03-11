@@ -19,9 +19,6 @@ async function sendPasswordResetEmail(email, name, resetToken) {
   const resetUrl     = `${config.passwordReset.appUrl}/reset-password?token=${resetToken}`;
   const expiryMins   = config.passwordReset.expiryMinutes;
 
-  console.log(`Sending password reset email to ${email} with token ${resetToken}`);
-  console.log(`Email Login: ${config.email.user}, Password: ${config.email.pass}`);
-
   const transporter = createTransporter({
     service: "Gmail",
     auth: {

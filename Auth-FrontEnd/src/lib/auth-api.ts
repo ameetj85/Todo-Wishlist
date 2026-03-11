@@ -10,6 +10,7 @@ type ApiFailure = {
   ok: false;
   status: number;
   error: string;
+  code?: string;
 };
 
 type ApiResult<TData> = ApiSuccess<TData> | ApiFailure;
@@ -96,10 +97,10 @@ async function request<TResponse>(
     };
   }
 
-  let json: (TResponse & { error?: string }) | null = null;
+  let json: (TResponse & { error?: string; code?: string }) | null = null;
 
   try {
-    json = await parseJson<TResponse & { error?: string }>(response);
+    json = await parseJson<TResponse & { error?: string; code?: string }>(response);
   } catch {
     json = null;
   }
@@ -109,6 +110,7 @@ async function request<TResponse>(
       ok: false,
       status: response.status,
       error: json?.error ?? "Request failed",
+      code: json?.code,
     };
   }
 

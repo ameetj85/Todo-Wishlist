@@ -16,6 +16,7 @@ import { clearAuthToken, getAuthToken, setAuthToken } from "@/lib/auth-cookie";
 export type ActionState = {
   error?: string;
   success?: string;
+  showUnverifiedModal?: boolean;
 };
 
 function getSafeNextPath(value: FormDataEntryValue | null) {
@@ -39,7 +40,10 @@ export async function loginAction(
   const response = await login({ email, password });
 
   if (!response.ok) {
-    return { error: response.error };
+    return {
+      error: response.error,
+      showUnverifiedModal: response.code === "UNVERIFIED_ACCOUNT",
+    };
   }
 
   await setAuthToken(response.data.token, response.data.expiresIn);

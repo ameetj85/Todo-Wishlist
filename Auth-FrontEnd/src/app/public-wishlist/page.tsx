@@ -72,7 +72,7 @@ export default async function PublicWishlistPage({
   if (!normalizedEmail) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl items-center px-6 py-12">
-        <Card className="w-full border-blue-200/70 shadow-sm">
+        <Card className="w-full border-border shadow-sm">
           <CardHeader>
             <CardTitle>Public Wishlist</CardTitle>
           </CardHeader>
@@ -89,7 +89,7 @@ export default async function PublicWishlistPage({
   if (!result.found) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl items-center px-6 py-12">
-        <Card className="w-full border-blue-200/70 shadow-sm">
+        <Card className="w-full border-border shadow-sm">
           <CardHeader>
             <CardTitle>Public Wishlist</CardTitle>
           </CardHeader>
@@ -103,21 +103,21 @@ export default async function PublicWishlistPage({
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl flex-col gap-5 px-4 py-10 sm:px-6">
-      <Card className="border-slate-200 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="space-y-2 pb-3">
-          <CardTitle className="text-2xl font-semibold text-slate-900">
+          <CardTitle className="text-2xl font-semibold text-foreground">
             {result.user?.name ?? "User"}&apos;s Wishlist
           </CardTitle>
-          <p className="text-sm text-slate-600">Viewing wishlist for: {normalizedEmail}</p>
+          <p className="text-sm text-muted-foreground">Viewing wishlist for: {normalizedEmail}</p>
         </CardHeader>
-        <CardContent className="border-t border-slate-100 pt-3 text-sm text-slate-600">
+        <CardContent className="border-t border-border pt-3 text-sm text-muted-foreground">
           {result.items.length} item{result.items.length === 1 ? "" : "s"}
         </CardContent>
       </Card>
 
       {result.items.length === 0 ? (
-        <Card className="border-slate-200 shadow-sm">
-          <CardContent className="py-6 text-sm text-slate-600">
+        <Card className="border-border shadow-sm">
+          <CardContent className="py-6 text-sm text-muted-foreground">
             This wishlist has no items yet.
           </CardContent>
         </Card>

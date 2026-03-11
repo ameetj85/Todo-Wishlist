@@ -93,6 +93,13 @@ router.post('/login', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
+  if (!user.isVerified) {
+    return res.status(403).json({
+      error: 'Your account is not verified yet. Please check your email for verification steps before signing in.',
+      code: 'UNVERIFIED_ACCOUNT',
+    });
+  }
+
   await prisma.session.deleteMany({
     where: {
       userId: user.id,

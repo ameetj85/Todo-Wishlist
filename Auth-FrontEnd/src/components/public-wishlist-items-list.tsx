@@ -74,7 +74,7 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
@@ -106,14 +106,14 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
         </div>
 
         <div className="flex items-center gap-2">
-          <label htmlFor="priority-filter" className="text-xs font-semibold text-slate-600">
+          <label htmlFor="priority-filter" className="text-xs font-semibold text-muted-foreground">
             Priority
           </label>
           <select
             id="priority-filter"
             value={priorityFilter}
             onChange={(event) => setPriorityFilter(event.target.value as PriorityFilter)}
-            className="h-8 rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 outline-none focus:border-blue-500"
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
           >
             <option value="any">Any priority</option>
             <option value="high">High</option>
@@ -124,12 +124,12 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
       </div>
 
       {filteredItems.length === 0 ? (
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-6 text-sm text-slate-600 shadow-sm">
+        <div className="rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground shadow-sm">
           No items match this filter.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <div className="hidden grid-cols-[96px_minmax(0,1fr)_110px_80px_160px] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold tracking-wide text-slate-600 uppercase md:grid">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="hidden grid-cols-[96px_minmax(0,1fr)_110px_80px_160px] gap-4 border-b border-border bg-muted/40 px-4 py-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase md:grid">
             <span>Item</span>
             <span>Details</span>
             <span>Price</span>
@@ -140,7 +140,7 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
           {filteredItems.map((item) => (
             <div
               key={item.item_id}
-              className={`border-b border-slate-100 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-gray-100" : "bg-white"}`}
+              className={`border-b border-border/60 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-muted/40" : "bg-card"}`}
             >
               <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_160px] md:items-center md:gap-4">
                 {item.item_image ? (
@@ -150,16 +150,16 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
                     width={80}
                     height={80}
                     unoptimized
-                    className="h-20 w-20 rounded-lg border border-slate-200 bg-slate-50 object-cover"
+                    className="h-20 w-20 rounded-lg border border-border bg-muted/40 object-cover"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground">
                     <Package className="size-8" />
                   </div>
                 )}
 
                 <div className="min-w-0 space-y-2">
-                  <p className="truncate text-[15px] font-medium text-slate-900" title={item.title}>
+                  <p className="truncate text-[15px] font-medium text-foreground" title={item.title}>
                     {item.title}
                   </p>
 
@@ -189,12 +189,12 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
                       <ExternalLink className="size-3.5 shrink-0" />
                     </a>
                   ) : (
-                    <p className="text-sm text-slate-500">No product link</p>
+                    <p className="text-sm text-muted-foreground">No product link</p>
                   )}
                 </div>
 
-                <div className="text-lg font-semibold text-slate-900">${item.price.toFixed(2)}</div>
-                <div className="text-sm font-medium text-slate-700">{item.quantity}</div>
+                <div className="text-lg font-semibold text-foreground">${item.price.toFixed(2)}</div>
+                <div className="text-sm font-medium text-muted-foreground">{item.quantity}</div>
 
                 <div className="flex flex-col items-start gap-1">
                   <PublicWishlistPurchasedButton
