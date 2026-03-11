@@ -12,6 +12,7 @@ const todoRoutes = require("./src/routes/todo");
 const wishlistRoutes = require("./src/routes/wishlist");
 
 const app = express();
+const isDevelopment = config.server.env !== "production";
 
 // ─── Security & Parsing ───────────────────────────────────────────────────────
 app.use(helmet());
@@ -23,6 +24,8 @@ app.set("trust proxy", 1);
 app.use(
   rateLimit({
     ...config.rateLimit.global,
+    max: isDevelopment ? Math.max(config.rateLimit.global.max, 1000) : config.rateLimit.global.max,
+    skip: (req) => req.path.startsWith("/api/auth/"),
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests, please try again later" },
@@ -31,6 +34,8 @@ app.use(
 
 const authLimiter = rateLimit({
   ...config.rateLimit.auth,
+  max: isDevelopment ? Math.max(config.rateLimit.auth.max, 100) : config.rateLimit.auth.max,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many auth attempts, please try again later" },
