@@ -136,6 +136,13 @@ describe("Frontend API contract", () => {
     assert.equal(typeof created.body.todo.user_id, "string");
     assert.equal(typeof created.body.todo.created_date, "string");
     assert.equal(typeof created.body.todo.completed, "boolean");
+    assert.equal(typeof created.body.todo.remind_me, "boolean");
+    assert.equal(
+      created.body.todo.reminder_date === null ||
+        typeof created.body.todo.reminder_date === "string",
+      true,
+    );
+    assert.equal(typeof created.body.todo.reminder_sent, "boolean");
 
     const list = await request(app, "GET", "/api/todos", null, {
       Authorization: `Bearer ${token}`,

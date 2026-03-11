@@ -17,6 +17,9 @@ type TodoItem = {
   name: string;
   description: string;
   due_date: string | null;
+  remind_me: boolean;
+  reminder_date: string | null;
+  reminder_sent: boolean;
   created_date: string;
   category: string;
   completed: boolean;
@@ -31,6 +34,9 @@ type TodoForm = {
   description: string;
   category: string;
   due_date: string;
+  remind_me: boolean;
+  reminder_date: string;
+  reminder_sent: boolean;
   completed: boolean;
 };
 
@@ -39,6 +45,31 @@ type SortDirection = "asc" | "desc";
 
 function toDateInputValue(value: string | null) {
   return value ?? "";
+}
+
+function toDateTimeInputValue(value: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const year = date.getFullYear();
+  const month = pad(date.getMonth() + 1);
+  const day = pad(date.getDate());
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+function toIsoDateTimeOrNull(value: string) {
+  if (!value.trim()) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString();
 }
 
 export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
@@ -54,6 +85,9 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     description: "",
     category: "",
     due_date: "",
+    remind_me: false,
+    reminder_date: "",
+    reminder_sent: false,
     completed: false,
   });
   const [isSubmittingTodo, setIsSubmittingTodo] = useState(false);
@@ -105,6 +139,9 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
       description: "",
       category: "",
       due_date: "",
+      remind_me: false,
+      reminder_date: "",
+      reminder_sent: false,
       completed: false,
     });
   }
@@ -125,6 +162,9 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
       description: todo.description,
       category: todo.category,
       due_date: toDateInputValue(todo.due_date),
+      remind_me: todo.remind_me,
+      reminder_date: toDateTimeInputValue(todo.reminder_date),
+      reminder_sent: todo.reminder_sent,
       completed: todo.completed,
     });
     setIsCustomCategory(!existingCategories.includes(todo.category));
@@ -141,6 +181,7 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     const description = todoForm.description.trim();
     const category = todoForm.category.trim();
     const dueDate = todoForm.due_date.trim();
+    const reminderDate = todoForm.reminder_date.trim();
 
     if (!name) {
       setError("Name is required");
@@ -157,6 +198,20 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
       return;
     }
 
+    if (todoForm.remind_me && !reminderDate) {
+      setError("Reminder date and time is required when Remind Me is enabled");
+      return;
+    }
+
+    const reminderDateIso = todoForm.remind_me
+      ? toIsoDateTimeOrNull(reminderDate)
+      : null;
+
+    if (todoForm.remind_me && !reminderDateIso) {
+      setError("Reminder date and time must be valid");
+      return;
+    }
+
     setError(null);
     setIsSubmittingTodo(true);
 
@@ -170,6 +225,9 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
           description,
           category,
           due_date: dueDate ? dueDate : null,
+          remind_me: todoForm.remind_me,
+          reminder_date: reminderDateIso,
+          reminder_sent: todoForm.remind_me ? todoForm.reminder_sent : false,
           completed: todoForm.completed,
         })
       : await createTodoAction({
@@ -177,6 +235,9 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
           description,
           category,
           due_date: dueDate ? dueDate : null,
+          remind_me: todoForm.remind_me,
+          reminder_date: reminderDateIso,
+          reminder_sent: false,
           completed: todoForm.completed,
         });
 
@@ -472,6 +533,36 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
                     }
                   />
                 </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={todoForm.remind_me}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    setTodoForm((prev) => ({
+                      ...prev,
+                      remind_me: enabled,
+                      reminder_date: enabled ? prev.reminder_date : "",
+                      reminder_sent: enabled ? prev.reminder_sent : false,
+                    }));
+                  }}
+                />
+                Remind me
+              </label>
+
+              <div className="space-y-1">
+                <Label htmlFor="todo-reminder-date">Reminder Date & Time</Label>
+                <Input
+                  id="todo-reminder-date"
+                  type="datetime-local"
+                  value={todoForm.reminder_date}
+                  disabled={!todoForm.remind_me}
+                  onChange={(event) =>
+                    setTodoForm((prev) => ({ ...prev, reminder_date: event.target.value }))
+                  }
+                />
               </div>
 
               <label className="flex items-center gap-2 text-sm text-foreground">

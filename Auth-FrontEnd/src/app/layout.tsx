@@ -41,6 +41,7 @@ export default async function RootLayout({
             isAuthenticated={session.isAuthenticated}
             isAdmin={!!session.user?.isAdmin}
             userName={session.user?.name ?? null}
+            dueTodayOpenTodoCount={session.isAuthenticated ? session.dueTodayOpenTodoCount : 0}
           />
           {children}
         </ThemeProvider>

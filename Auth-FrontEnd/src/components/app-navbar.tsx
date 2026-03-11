@@ -3,6 +3,7 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
+import { Bell } from "lucide-react";
 
 import { NAVBAR_LINK_CLASS_NAME, NavbarLink } from "@/components/navbar-link";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -16,12 +17,18 @@ type AppNavbarProps = {
   isAuthenticated: boolean;
   isAdmin: boolean;
   userName?: string | null;
+  dueTodayOpenTodoCount?: number;
 };
 
 const themeNavLinkClassName =
   "border border-border bg-background text-foreground hover:bg-accent hover:text-accent-foreground";
 
-export function AppNavbar({ isAuthenticated, isAdmin, userName }: AppNavbarProps) {
+export function AppNavbar({
+  isAuthenticated,
+  isAdmin,
+  userName,
+  dueTodayOpenTodoCount = 0,
+}: AppNavbarProps) {
   const emailInputId = useId();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -44,6 +51,11 @@ export function AppNavbar({ isAuthenticated, isAdmin, userName }: AppNavbarProps
   const onChangePasswordPage = pathname === "/change-password";
   const onAdminConsolePage = pathname === "/admin-console";
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailAddress.trim());
+  const isDueTodayOpenFilterActive =
+    pathname === "/todo" && searchParams.get("filter") === "due-today-open";
+  const showDueTodayBell =
+    isAuthenticated && (dueTodayOpenTodoCount > 0 || isDueTodayOpenFilterActive);
+  const bellCountLabel = dueTodayOpenTodoCount > 99 ? "99+" : `${dueTodayOpenTodoCount}`;
 
   useEffect(() => {
     function onWindowClick(event: MouseEvent) {
@@ -182,6 +194,26 @@ export function AppNavbar({ isAuthenticated, isAdmin, userName }: AppNavbarProps
           </div>
 
           <div className="flex items-center justify-self-end gap-2">
+            {showDueTodayBell ? (
+              <a
+                href="/todo?filter=due-today-open"
+                title="you have Todos due today"
+                aria-label={`You have ${dueTodayOpenTodoCount} todos due today`}
+                className={cn(
+                  "relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background hover:bg-accent",
+                  isDueTodayOpenFilterActive &&
+                    "border-amber-400 bg-amber-50 text-amber-700 shadow-sm ring-2 ring-amber-200",
+                )}
+              >
+                <Bell className="h-5 w-5" />
+                {dueTodayOpenTodoCount > 0 ? (
+                  <span className="absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
+                    {bellCountLabel}
+                  </span>
+                ) : null}
+              </a>
+            ) : null}
+
             <div className="relative" ref={profileMenuRef}>
               <button
                 type="button"

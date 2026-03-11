@@ -16,6 +16,9 @@ function toTodoResponse(row) {
     name: row.name,
     description: row.description,
     due_date: row.dueDate,
+    remind_me: !!row.remindMe,
+    reminder_date: row.reminderDate,
+    reminder_sent: !!row.reminderSent,
     created_date: row.createdDate,
     category: row.category,
     completed: !!row.completed,
@@ -31,8 +34,21 @@ function isValidDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isValidDateTime(value) {
+  return !Number.isNaN(Date.parse(value));
+}
+
 router.post("/", async (req, res) => {
-  const { name, description, due_date, category, completed } = req.body;
+  const {
+    name,
+    description,
+    due_date,
+    category,
+    completed,
+    remind_me,
+    reminder_date,
+    reminder_sent,
+  } = req.body;
 
   if (!name || typeof name !== "string" || !name.trim()) {
     return res.status(400).json({ error: "name is required" });
@@ -55,6 +71,26 @@ router.post("/", async (req, res) => {
   if (completed !== undefined && typeof completed !== "boolean") {
     return res.status(400).json({ error: "completed must be a boolean" });
   }
+  if (remind_me !== undefined && typeof remind_me !== "boolean") {
+    return res.status(400).json({ error: "remind_me must be a boolean" });
+  }
+  if (
+    reminder_date !== undefined &&
+    reminder_date !== null &&
+    (typeof reminder_date !== "string" || !isValidDateTime(reminder_date))
+  ) {
+    return res
+      .status(400)
+      .json({ error: "reminder_date must be null or a valid datetime" });
+  }
+  if (reminder_sent !== undefined && typeof reminder_sent !== "boolean") {
+    return res.status(400).json({ error: "reminder_sent must be a boolean" });
+  }
+  if (reminder_sent === true && (reminder_date ?? null) === null) {
+    return res.status(400).json({
+      error: "reminder_date is required when reminder_sent is true",
+    });
+  }
 
   const todo = await prisma.todo.create({
     data: {
@@ -64,6 +100,9 @@ router.post("/", async (req, res) => {
       dueDate: due_date ?? null,
       category: category.trim(),
       completed: !!completed,
+      remindMe: remind_me ?? false,
+      reminderDate: reminder_date ?? null,
+      reminderSent: reminder_sent ?? false,
       createdDate: toSqliteDateOnly(Date.now()),
     },
   });
@@ -72,8 +111,18 @@ router.post("/", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
+  const dueTodayOpenOnly =
+    req.query.due_today_open === "1" || req.query.due_today_open === "true";
+
+  const where = { userId: req.user.id };
+
+  if (dueTodayOpenOnly) {
+    where.dueDate = toSqliteDateOnly(Date.now());
+    where.completed = false;
+  }
+
   const todos = await prisma.todo.findMany({
-    where: { userId: req.user.id },
+    where,
     orderBy: [{ createdDate: "desc" }, { todoId: "desc" }],
   });
 
@@ -96,7 +145,16 @@ router.put("/", async (req, res) => {
   const todoId = parseTodoId(req.body.todo_id);
   if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
 
-  const { name, description, due_date, category, completed } = req.body;
+  const {
+    name,
+    description,
+    due_date,
+    category,
+    completed,
+    remind_me,
+    reminder_date,
+    reminder_sent,
+  } = req.body;
   const data = {};
 
   if (name !== undefined) {
@@ -133,6 +191,54 @@ router.put("/", async (req, res) => {
     if (typeof completed !== "boolean")
       return res.status(400).json({ error: "completed must be a boolean" });
     data.completed = completed;
+  }
+  if (remind_me !== undefined) {
+    if (typeof remind_me !== "boolean")
+      return res.status(400).json({ error: "remind_me must be a boolean" });
+    data.remindMe = remind_me;
+  }
+  if (reminder_date !== undefined) {
+    if (
+      reminder_date !== null &&
+      (typeof reminder_date !== "string" || !isValidDateTime(reminder_date))
+    ) {
+      return res
+        .status(400)
+        .json({ error: "reminder_date must be null or a valid datetime" });
+    }
+    data.reminderDate = reminder_date;
+  }
+  if (reminder_sent !== undefined) {
+    if (typeof reminder_sent !== "boolean")
+      return res
+        .status(400)
+        .json({ error: "reminder_sent must be a boolean" });
+    data.reminderSent = reminder_sent;
+  }
+
+  const touchesReminderState =
+    reminder_sent !== undefined || reminder_date !== undefined;
+
+  if (touchesReminderState) {
+    const existingTodo = await prisma.todo.findFirst({
+      where: { todoId, userId: req.user.id },
+      select: { reminderDate: true, reminderSent: true },
+    });
+
+    if (!existingTodo) {
+      return res.status(404).json({ error: "Todo not found" });
+    }
+
+    const nextReminderSent =
+      reminder_sent !== undefined ? reminder_sent : !!existingTodo.reminderSent;
+    const nextReminderDate =
+      reminder_date !== undefined ? reminder_date : existingTodo.reminderDate;
+
+    if (nextReminderSent === true && nextReminderDate === null) {
+      return res.status(400).json({
+        error: "reminder_date is required when reminder_sent is true",
+      });
+    }
   }
 
   if (Object.keys(data).length === 0) {

@@ -8,6 +8,9 @@ type TodoPayload = {
   category: string;
   due_date: string | null;
   completed: boolean;
+  remind_me?: boolean;
+  reminder_date?: string | null;
+  reminder_sent?: boolean;
 };
 
 type TodoResult = { ok: true; todo: unknown } | { ok: false; error: string };

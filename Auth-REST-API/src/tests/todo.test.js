@@ -83,6 +83,9 @@ describe("Todo CRUD Routes", () => {
         category: "Personal",
         due_date: "2099-01-01",
         completed: false,
+        remind_me: true,
+        reminder_date: "2099-01-01T09:30:00.000Z",
+        reminder_sent: false,
       },
       { Authorization: `Bearer ${token}` },
     );
@@ -90,6 +93,9 @@ describe("Todo CRUD Routes", () => {
     assert.equal(res.status, 201);
     assert.equal(res.body.todo.name, "Buy milk");
     assert.equal(res.body.todo.completed, false);
+    assert.equal(res.body.todo.remind_me, true);
+    assert.equal(res.body.todo.reminder_date, "2099-01-01T09:30:00.000Z");
+    assert.equal(res.body.todo.reminder_sent, false);
     assert.ok(res.body.todo.created_date);
   });
 
@@ -120,6 +126,68 @@ describe("Todo CRUD Routes", () => {
     assert.equal(list1.status, 200);
     assert.equal(list1.body.todos.length, 1);
     assert.equal(list1.body.todos[0].name, "U1 Todo");
+  });
+
+  it("filters todos due today and not completed", async () => {
+    const token = await signupAndGetToken("due-today@example.com");
+
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "Due today open",
+        description: "Should be included",
+        category: "Work",
+        due_date: today,
+        completed: false,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "Due today completed",
+        description: "Should be excluded",
+        category: "Work",
+        due_date: today,
+        completed: true,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "Due tomorrow open",
+        description: "Should be excluded",
+        category: "Work",
+        due_date: tomorrow,
+        completed: false,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    const filtered = await request(app, "GET", "/api/todos?due_today_open=1", null, {
+      Authorization: `Bearer ${token}`,
+    });
+
+    assert.equal(filtered.status, 200);
+    assert.equal(filtered.body.todos.length, 1);
+    assert.equal(filtered.body.todos[0].name, "Due today open");
+    assert.equal(filtered.body.todos[0].completed, false);
+    assert.equal(filtered.body.todos[0].due_date, today);
   });
 
   it("gets a todo by id", async () => {
@@ -159,13 +227,83 @@ describe("Todo CRUD Routes", () => {
       app,
       "PUT",
       "/api/todos",
-      { todo_id: todoId, name: "New title", completed: true },
+      {
+        todo_id: todoId,
+        name: "New title",
+        completed: true,
+        remind_me: true,
+        reminder_date: "2099-05-05T12:00:00.000Z",
+        reminder_sent: true,
+      },
       { Authorization: `Bearer ${token}` },
     );
 
     assert.equal(update.status, 200);
     assert.equal(update.body.todo.name, "New title");
     assert.equal(update.body.todo.completed, true);
+    assert.equal(update.body.todo.remind_me, true);
+    assert.equal(update.body.todo.reminder_date, "2099-05-05T12:00:00.000Z");
+    assert.equal(update.body.todo.reminder_sent, true);
+  });
+
+  it("rejects create when reminder_sent is true and reminder_date is null", async () => {
+    const token = await signupAndGetToken();
+
+    const res = await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "Invalid reminder",
+        description: "Should fail",
+        category: "Work",
+        remind_me: true,
+        reminder_date: null,
+        reminder_sent: true,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    assert.equal(res.status, 400);
+    assert.equal(
+      res.body.error,
+      "reminder_date is required when reminder_sent is true",
+    );
+  });
+
+  it("rejects update that would set reminder_sent true without reminder_date", async () => {
+    const token = await signupAndGetToken();
+
+    const create = await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "Prepare meeting",
+        description: "Set reminder first",
+        category: "Work",
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    const todoId = create.body.todo.todo_id;
+
+    const update = await request(
+      app,
+      "PUT",
+      "/api/todos",
+      {
+        todo_id: todoId,
+        reminder_sent: true,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    assert.equal(update.status, 400);
+    assert.equal(
+      update.body.error,
+      "reminder_date is required when reminder_sent is true",
+    );
   });
 
   it("deletes a todo", async () => {

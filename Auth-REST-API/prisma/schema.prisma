@@ -56,6 +56,9 @@ model Todo {
   name         String
   description  String
   dueDate      String? @map("due_date")
+  remindMe     Boolean @default(false) @map("remind_me")
+  reminderDate String? @map("reminder_date")
+  reminderSent Boolean @default(false) @map("reminder_sent")
   createdDate  String  @default(dbgenerated("(date('now'))")) @map("created_date")
   category     String
   completed    Boolean @default(false)

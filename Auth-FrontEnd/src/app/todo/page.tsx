@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import {
   Card,
@@ -16,6 +17,9 @@ type TodoItem = {
   name: string;
   description: string;
   due_date: string | null;
+  remind_me: boolean;
+  reminder_date: string | null;
+  reminder_sent: boolean;
   created_date: string;
   category: string;
   completed: boolean;
@@ -36,9 +40,11 @@ function getApiBaseUrl() {
   return value.replace(/\/$/, "");
 }
 
-async function fetchTodos(token: string): Promise<TodoListResponse> {
+async function fetchTodos(token: string, dueTodayOpenOnly: boolean): Promise<TodoListResponse> {
+  const query = dueTodayOpenOnly ? "?due_today_open=1" : "";
+
   try {
-    const response = await fetch(`${getApiBaseUrl()}/api/todos`, {
+    const response = await fetch(`${getApiBaseUrl()}/api/todos${query}`, {
       method: "GET",
       cache: "no-store",
       headers: {
@@ -69,7 +75,11 @@ async function fetchTodos(token: string): Promise<TodoListResponse> {
 
 export const dynamic = "force-dynamic";
 
-export default async function TodoPage() {
+export default async function TodoPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
   const session = await getSessionData();
 
   if (!session.isAuthenticated) {
@@ -82,7 +92,10 @@ export default async function TodoPage() {
     redirect("/login?next=/todo");
   }
 
-  const todoList = await fetchTodos(token);
+  const params = await searchParams;
+  const dueTodayOpenOnly = params.filter === "due-today-open";
+
+  const todoList = await fetchTodos(token, dueTodayOpenOnly);
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-5xl flex-col gap-5 px-4 py-10 sm:px-6">
@@ -90,8 +103,23 @@ export default async function TodoPage() {
         <CardHeader className="space-y-2 pb-3">
           <CardTitle>Todo List</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Organize your top priorities and keep your day focused.
+            {dueTodayOpenOnly
+              ? "Showing only todos due today that are not completed."
+              : "Organize your top priorities and keep your day focused."}
           </p>
+          {dueTodayOpenOnly ? (
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                Due today
+              </span>
+              <Link
+                href="/todo"
+                className="text-xs font-medium text-blue-600 underline-offset-2 hover:underline"
+              >
+                Show all
+              </Link>
+            </div>
+          ) : null}
         </CardHeader>
         <CardContent className="border-t border-border pt-3 text-sm text-muted-foreground">
           {todoList.todos.length} todo{todoList.todos.length === 1 ? "" : "s"}
