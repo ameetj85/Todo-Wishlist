@@ -197,8 +197,8 @@ export function AppNavbar({
             {showDueTodayBell ? (
               <a
                 href="/todo?filter=due-today-open"
-                title="you have Todos due today"
-                aria-label={`You have ${dueTodayOpenTodoCount} todos due today`}
+                title="you have Todos due today or overdue"
+                aria-label={`You have ${dueTodayOpenTodoCount} todos due today or overdue`}
                 className={cn(
                   "relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background hover:bg-accent",
                   isDueTodayOpenFilterActive &&

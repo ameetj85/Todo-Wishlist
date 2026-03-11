@@ -104,13 +104,13 @@ export default async function TodoPage({
           <CardTitle>Todo List</CardTitle>
           <p className="text-sm text-muted-foreground">
             {dueTodayOpenOnly
-              ? "Showing only todos due today that are not completed."
+              ? "Showing only todos due today or overdue that are not completed."
               : "Organize your top priorities and keep your day focused."}
           </p>
           {dueTodayOpenOnly ? (
             <div className="flex items-center gap-3">
               <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
-                Due today
+                Due/Overdue
               </span>
               <Link
                 href="/todo"

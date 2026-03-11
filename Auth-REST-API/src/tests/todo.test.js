@@ -128,14 +128,31 @@ describe("Todo CRUD Routes", () => {
     assert.equal(list1.body.todos[0].name, "U1 Todo");
   });
 
-  it("filters todos due today and not completed", async () => {
+  it("filters todos due today or overdue and not completed", async () => {
     const token = await signupAndGetToken("due-today@example.com");
 
     const now = new Date();
     const today = now.toISOString().slice(0, 10);
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
       .toISOString()
       .slice(0, 10);
+
+    await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "Overdue open",
+        description: "Should be included",
+        category: "Work",
+        due_date: yesterday,
+        completed: false,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
 
     await request(
       app,
@@ -146,6 +163,20 @@ describe("Todo CRUD Routes", () => {
         description: "Should be included",
         category: "Work",
         due_date: today,
+        completed: false,
+      },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    await request(
+      app,
+      "POST",
+      "/api/todos",
+      {
+        name: "No due date open",
+        description: "Should be excluded",
+        category: "Work",
+        due_date: null,
         completed: false,
       },
       { Authorization: `Bearer ${token}` },
@@ -184,10 +215,23 @@ describe("Todo CRUD Routes", () => {
     });
 
     assert.equal(filtered.status, 200);
-    assert.equal(filtered.body.todos.length, 1);
-    assert.equal(filtered.body.todos[0].name, "Due today open");
-    assert.equal(filtered.body.todos[0].completed, false);
-    assert.equal(filtered.body.todos[0].due_date, today);
+    assert.equal(filtered.body.todos.length, 2);
+    assert.equal(
+      filtered.body.todos.some((todo) => todo.name === "Overdue open"),
+      true,
+    );
+    assert.equal(
+      filtered.body.todos.some((todo) => todo.name === "Due today open"),
+      true,
+    );
+    assert.equal(
+      filtered.body.todos.every((todo) => todo.completed === false),
+      true,
+    );
+    assert.equal(
+      filtered.body.todos.every((todo) => todo.due_date !== null && todo.due_date <= today),
+      true,
+    );
   });
 
   it("gets a todo by id", async () => {

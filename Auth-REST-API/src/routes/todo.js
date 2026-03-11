@@ -111,13 +111,16 @@ router.post("/", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  const dueTodayOpenOnly =
+  const dueTodayOrOverdueOpenOnly =
     req.query.due_today_open === "1" || req.query.due_today_open === "true";
 
   const where = { userId: req.user.id };
 
-  if (dueTodayOpenOnly) {
-    where.dueDate = toSqliteDateOnly(Date.now());
+  if (dueTodayOrOverdueOpenOnly) {
+    where.dueDate = {
+      not: null,
+      lte: toSqliteDateOnly(Date.now()),
+    };
     where.completed = false;
   }
 
