@@ -29,9 +29,6 @@
 /Auth-REST-API/node_modules/
 /Auth-REST-API/.env
 !/Auth-REST-API/.env.example
-/Auth-REST-API/data/*.db
-/Auth-REST-API/data/*.db-shm
-/Auth-REST-API/data/*.db-wal
 /Auth-REST-API/mnt/user-data/outputs/
 
 # =========================
