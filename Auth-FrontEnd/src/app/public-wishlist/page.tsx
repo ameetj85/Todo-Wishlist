@@ -64,9 +64,9 @@ async function fetchPublicWishlist(
 export default async function PublicWishlistPage({
   searchParams,
 }: {
-  searchParams: { email?: string } | Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string }>;
 }) {
-  const { email = "" } = await Promise.resolve(searchParams);
+  const { email = "" } = await searchParams;
   const normalizedEmail = email.trim();
 
   if (!normalizedEmail) {

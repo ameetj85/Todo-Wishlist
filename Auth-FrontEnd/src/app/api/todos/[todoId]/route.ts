@@ -22,7 +22,7 @@ type UpdateTodoBody = {
 
 export async function DELETE(
   _request: Request,
-  context: { params: Promise<{ todoId: string }> | { todoId: string } },
+  context: { params: Promise<{ todoId: string }> },
 ) {
   const token = await getAuthToken();
 
@@ -30,8 +30,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const resolved = await Promise.resolve(context.params);
-  const todoId = Number.parseInt(resolved.todoId, 10);
+  const { todoId: todoIdParam } = await context.params;
+  const todoId = Number.parseInt(todoIdParam, 10);
 
   if (!Number.isInteger(todoId) || todoId <= 0) {
     return NextResponse.json({ error: "Invalid todo_id" }, { status: 400 });
@@ -60,7 +60,7 @@ export async function DELETE(
 
 export async function PUT(
   request: Request,
-  context: { params: Promise<{ todoId: string }> | { todoId: string } },
+  context: { params: Promise<{ todoId: string }> },
 ) {
   const token = await getAuthToken();
 
@@ -68,8 +68,8 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const resolved = await Promise.resolve(context.params);
-  const todoId = Number.parseInt(resolved.todoId, 10);
+  const { todoId: todoIdParam } = await context.params;
+  const todoId = Number.parseInt(todoIdParam, 10);
 
   if (!Number.isInteger(todoId) || todoId <= 0) {
     return NextResponse.json({ error: "Invalid todo_id" }, { status: 400 });

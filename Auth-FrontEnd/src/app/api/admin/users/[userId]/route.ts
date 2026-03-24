@@ -14,7 +14,7 @@ function getApiBaseUrl() {
 
 export async function PUT(
   request: Request,
-  context: { params: Promise<{ userId: string }> | { userId: string } },
+  context: { params: Promise<{ userId: string }> },
 ) {
   const token = await getAuthToken();
 
@@ -22,9 +22,9 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const resolved = await Promise.resolve(context.params);
+  const { userId } = await context.params;
 
-  if (!resolved.userId) {
+  if (!userId) {
     return NextResponse.json({ error: "Invalid userId" }, { status: 400 });
   }
 
@@ -38,7 +38,7 @@ export async function PUT(
 
   try {
     const response = await fetch(
-      `${getApiBaseUrl()}/api/admin/users/${encodeURIComponent(resolved.userId)}`,
+      `${getApiBaseUrl()}/api/admin/users/${encodeURIComponent(userId)}`,
       {
         method: "PUT",
         cache: "no-store",

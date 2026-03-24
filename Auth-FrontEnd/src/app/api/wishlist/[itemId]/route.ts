@@ -14,7 +14,7 @@ function getApiBaseUrl() {
 
 export async function DELETE(
   _request: Request,
-  context: { params: Promise<{ itemId: string }> | { itemId: string } },
+  context: { params: Promise<{ itemId: string }> },
 ) {
   const token = await getAuthToken();
 
@@ -22,8 +22,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const resolved = await Promise.resolve(context.params);
-  const itemId = Number.parseInt(resolved.itemId, 10);
+  const { itemId: itemIdParam } = await context.params;
+  const itemId = Number.parseInt(itemIdParam, 10);
 
   if (!Number.isInteger(itemId) || itemId <= 0) {
     return NextResponse.json({ error: "Invalid item_id" }, { status: 400 });
@@ -52,7 +52,7 @@ export async function DELETE(
 
 export async function PUT(
   request: Request,
-  context: { params: Promise<{ itemId: string }> | { itemId: string } },
+  context: { params: Promise<{ itemId: string }> },
 ) {
   const token = await getAuthToken();
 
@@ -60,8 +60,8 @@ export async function PUT(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const resolved = await Promise.resolve(context.params);
-  const itemId = Number.parseInt(resolved.itemId, 10);
+  const { itemId: itemIdParam } = await context.params;
+  const itemId = Number.parseInt(itemIdParam, 10);
 
   if (!Number.isInteger(itemId) || itemId <= 0) {
     return NextResponse.json({ error: "Invalid item_id" }, { status: 400 });

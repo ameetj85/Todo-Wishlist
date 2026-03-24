@@ -7,7 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export default function VerifyEmailSentPage() {
   return (
@@ -35,9 +36,12 @@ export default function VerifyEmailSentPage() {
           </p>
 
           <div className="flex gap-2">
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/login">Back to Login</Link>
-            </Button>
+            <Link
+              href="/login"
+              className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+            >
+              Back to Login
+            </Link>
           </div>
         </CardContent>
       </Card>
