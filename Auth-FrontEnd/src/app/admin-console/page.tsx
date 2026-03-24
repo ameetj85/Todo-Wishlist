@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import {
   getAdminOverviewAction,
-  type AdminOverviewResponse,
 } from "@/app/actions/admin-console";
 import { AdminConsoleTabs } from "@/components/admin-console-tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

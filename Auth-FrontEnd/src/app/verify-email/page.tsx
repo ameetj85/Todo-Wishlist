@@ -40,7 +40,7 @@ export default function VerifyEmailPage() {
             }, 2000);
           }
         })
-        .catch((error) => {
+        .catch(() => {
           setState({ error: "An error occurred during verification. Please try again." });
         })
         .finally(() => {

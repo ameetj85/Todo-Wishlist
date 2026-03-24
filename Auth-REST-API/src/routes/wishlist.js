@@ -1,9 +1,9 @@
-"use strict";
+'use strict';
 
-const express = require("express");
-const { prisma } = require("../db/prisma");
-const { requireAuth } = require("../middleware/auth");
-const { toSqliteDateOnly } = require("../utils/dates");
+const express = require('express');
+const { prisma } = require('../db/prisma');
+const { requireAuth } = require('../middleware/auth');
+const { toSqliteDateOnly } = require('../utils/dates');
 
 const router = express.Router();
 
@@ -28,12 +28,12 @@ function parsePrice(value) {
     return { value: 0 };
   }
 
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return { error: "price must be a number" };
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return { error: 'price must be a number' };
   }
 
   if (value < 0) {
-    return { error: "price must be greater than or equal to 0" };
+    return { error: 'price must be greater than or equal to 0' };
   }
 
   return { value };
@@ -41,14 +41,14 @@ function parsePrice(value) {
 
 function parseOptionalImageBlob(itemImage) {
   if (itemImage === undefined || itemImage === null) return { blob: itemImage };
-  if (typeof itemImage !== "string") {
-    return { error: "item_image must be a base64 string" };
+  if (typeof itemImage !== 'string') {
+    return { error: 'item_image must be a base64 string' };
   }
   try {
-    const blob = Buffer.from(itemImage, "base64");
+    const blob = Buffer.from(itemImage, 'base64');
     return { blob };
   } catch {
-    return { error: "item_image must be a valid base64 string" };
+    return { error: 'item_image must be a valid base64 string' };
   }
 }
 
@@ -59,7 +59,7 @@ function toWishlistResponse(row) {
     title: row.title,
     description: row.description,
     url: row.url,
-    item_image: row.itemImage ? Buffer.from(row.itemImage).toString("base64") : null,
+    item_image: row.itemImage ? Buffer.from(row.itemImage).toString('base64') : null,
     price: Number(row.price ?? 0),
     priority: row.priority,
     quantity: row.quantity,
@@ -82,13 +82,13 @@ async function resolveSequenceForCreate(userId, requestedSequence) {
   return (maxResult._max.sequence ?? 0) + 1;
 }
 
-router.get("/public/by-email", async (req, res) => {
-  const email = String(req.query.email ?? "")
+router.get('/public/by-email', async (req, res) => {
+  const email = String(req.query.email ?? '')
     .trim()
     .toLowerCase();
 
   if (!email || !isValidEmail(email)) {
-    return res.status(400).json({ error: "Valid email is required" });
+    return res.status(400).json({ error: 'Valid email is required' });
   }
 
   const user = await prisma.user.findFirst({
@@ -102,7 +102,7 @@ router.get("/public/by-email", async (req, res) => {
 
   const items = await prisma.wishlistItem.findMany({
     where: { userId: user.id },
-    orderBy: [{ sequence: "asc" }, { createdDate: "desc" }, { itemId: "desc" }],
+    orderBy: [{ sequence: 'asc' }, { createdDate: 'desc' }, { itemId: 'desc' }],
   });
 
   return res.json({
@@ -112,23 +112,23 @@ router.get("/public/by-email", async (req, res) => {
   });
 });
 
-router.patch("/public/purchased", async (req, res) => {
-  const email = String(req.body?.email ?? "")
+router.patch('/public/purchased', async (req, res) => {
+  const email = String(req.body?.email ?? '')
     .trim()
     .toLowerCase();
   const itemId = parseItemId(req.body?.item_id);
   const purchased = req.body?.purchased;
 
   if (!email || !isValidEmail(email)) {
-    return res.status(400).json({ error: "Valid email is required" });
+    return res.status(400).json({ error: 'Valid email is required' });
   }
 
   if (!itemId) {
-    return res.status(400).json({ error: "Valid item_id is required" });
+    return res.status(400).json({ error: 'Valid item_id is required' });
   }
 
-  if (typeof purchased !== "boolean") {
-    return res.status(400).json({ error: "purchased must be a boolean" });
+  if (typeof purchased !== 'boolean') {
+    return res.status(400).json({ error: 'purchased must be a boolean' });
   }
 
   const user = await prisma.user.findFirst({
@@ -137,7 +137,7 @@ router.patch("/public/purchased", async (req, res) => {
   });
 
   if (!user) {
-    return res.status(404).json({ error: "Wishlist owner not found" });
+    return res.status(404).json({ error: 'Wishlist owner not found' });
   }
 
   const result = await prisma.wishlistItem.updateMany({
@@ -146,7 +146,7 @@ router.patch("/public/purchased", async (req, res) => {
   });
 
   if (result.count === 0) {
-    return res.status(404).json({ error: "Wishlist item not found" });
+    return res.status(404).json({ error: 'Wishlist item not found' });
   }
 
   const item = await prisma.wishlistItem.findFirst({
@@ -158,7 +158,7 @@ router.patch("/public/purchased", async (req, res) => {
 
 router.use(requireAuth);
 
-router.post("/", async (req, res) => {
+router.post('/', async (req, res) => {
   const {
     title,
     description,
@@ -171,33 +171,33 @@ router.post("/", async (req, res) => {
     sequence,
   } = req.body;
 
-  if (!title || typeof title !== "string" || !title.trim()) {
-    return res.status(400).json({ error: "title is required" });
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    return res.status(400).json({ error: 'title is required' });
   }
   if (
     description !== undefined &&
     description !== null &&
-    typeof description !== "string"
+    typeof description !== 'string'
   ) {
-    return res.status(400).json({ error: "description must be a string" });
+    return res.status(400).json({ error: 'description must be a string' });
   }
-  if (url !== undefined && url !== null && typeof url !== "string") {
-    return res.status(400).json({ error: "url must be a string" });
+  if (url !== undefined && url !== null && typeof url !== 'string') {
+    return res.status(400).json({ error: 'url must be a string' });
   }
   if (priority !== undefined && ![0, 1, 2].includes(priority)) {
     return res
       .status(400)
-      .json({ error: "priority must be one of 0, 1, or 2" });
+      .json({ error: 'priority must be one of 0, 1, or 2' });
   }
   if (quantity !== undefined) {
-    const quantityErr = parseInteger(quantity, "quantity", { min: 1 });
+    const quantityErr = parseInteger(quantity, 'quantity', { min: 1 });
     if (quantityErr) return res.status(400).json({ error: quantityErr });
   }
-  if (purchased !== undefined && typeof purchased !== "boolean") {
-    return res.status(400).json({ error: "purchased must be a boolean" });
+  if (purchased !== undefined && typeof purchased !== 'boolean') {
+    return res.status(400).json({ error: 'purchased must be a boolean' });
   }
   if (sequence !== undefined) {
-    const sequenceErr = parseInteger(sequence, "sequence", { min: 0 });
+    const sequenceErr = parseInteger(sequence, 'sequence', { min: 0 });
     if (sequenceErr) return res.status(400).json({ error: sequenceErr });
   }
 
@@ -230,30 +230,30 @@ router.post("/", async (req, res) => {
   return res.status(201).json({ item: toWishlistResponse(item) });
 });
 
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
   const items = await prisma.wishlistItem.findMany({
     where: { userId: req.user.id },
-    orderBy: [{ sequence: "asc" }, { createdDate: "desc" }, { itemId: "desc" }],
+    orderBy: [{ sequence: 'asc' }, { createdDate: 'desc' }, { itemId: 'desc' }],
   });
 
   return res.json({ items: items.map(toWishlistResponse) });
 });
 
-router.get("/:itemId", async (req, res) => {
+router.get('/:itemId', async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
-  if (!itemId) return res.status(400).json({ error: "Invalid item_id" });
+  if (!itemId) return res.status(400).json({ error: 'Invalid item_id' });
 
   const item = await prisma.wishlistItem.findFirst({
     where: { itemId, userId: req.user.id },
   });
 
-  if (!item) return res.status(404).json({ error: "Wishlist item not found" });
+  if (!item) return res.status(404).json({ error: 'Wishlist item not found' });
   return res.json({ item: toWishlistResponse(item) });
 });
 
-router.put("/:itemId", async (req, res) => {
+router.put('/:itemId', async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
-  if (!itemId) return res.status(400).json({ error: "Invalid item_id" });
+  if (!itemId) return res.status(400).json({ error: 'Invalid item_id' });
 
   const {
     title,
@@ -270,26 +270,26 @@ router.put("/:itemId", async (req, res) => {
   const data = {};
 
   if (title !== undefined) {
-    if (typeof title !== "string" || !title.trim()) {
+    if (typeof title !== 'string' || !title.trim()) {
       return res
         .status(400)
-        .json({ error: "title must be a non-empty string" });
+        .json({ error: 'title must be a non-empty string' });
     }
     data.title = title.trim();
   }
 
   if (description !== undefined) {
-    if (description !== null && typeof description !== "string") {
+    if (description !== null && typeof description !== 'string') {
       return res
         .status(400)
-        .json({ error: "description must be a string or null" });
+        .json({ error: 'description must be a string or null' });
     }
     data.description = description;
   }
 
   if (url !== undefined) {
-    if (url !== null && typeof url !== "string") {
-      return res.status(400).json({ error: "url must be a string or null" });
+    if (url !== null && typeof url !== 'string') {
+      return res.status(400).json({ error: 'url must be a string or null' });
     }
     data.url = url;
   }
@@ -312,26 +312,26 @@ router.put("/:itemId", async (req, res) => {
     if (![0, 1, 2].includes(priority)) {
       return res
         .status(400)
-        .json({ error: "priority must be one of 0, 1, or 2" });
+        .json({ error: 'priority must be one of 0, 1, or 2' });
     }
     data.priority = priority;
   }
 
   if (quantity !== undefined) {
-    const quantityErr = parseInteger(quantity, "quantity", { min: 1 });
+    const quantityErr = parseInteger(quantity, 'quantity', { min: 1 });
     if (quantityErr) return res.status(400).json({ error: quantityErr });
     data.quantity = quantity;
   }
 
   if (purchased !== undefined) {
-    if (typeof purchased !== "boolean") {
-      return res.status(400).json({ error: "purchased must be a boolean" });
+    if (typeof purchased !== 'boolean') {
+      return res.status(400).json({ error: 'purchased must be a boolean' });
     }
     data.purchased = purchased;
   }
 
   if (sequence !== undefined) {
-    const sequenceErr = parseInteger(sequence, "sequence", { min: 0 });
+    const sequenceErr = parseInteger(sequence, 'sequence', { min: 0 });
     if (sequenceErr) return res.status(400).json({ error: sequenceErr });
     data.sequence = sequence;
   }
@@ -339,7 +339,7 @@ router.put("/:itemId", async (req, res) => {
   if (Object.keys(data).length === 0) {
     return res
       .status(400)
-      .json({ error: "At least one updatable field is required" });
+      .json({ error: 'At least one updatable field is required' });
   }
 
   const result = await prisma.wishlistItem.updateMany({
@@ -348,7 +348,7 @@ router.put("/:itemId", async (req, res) => {
   });
 
   if (result.count === 0) {
-    return res.status(404).json({ error: "Wishlist item not found" });
+    return res.status(404).json({ error: 'Wishlist item not found' });
   }
 
   const item = await prisma.wishlistItem.findFirst({
@@ -358,19 +358,19 @@ router.put("/:itemId", async (req, res) => {
   return res.json({ item: toWishlistResponse(item) });
 });
 
-router.delete("/:itemId", async (req, res) => {
+router.delete('/:itemId', async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
-  if (!itemId) return res.status(400).json({ error: "Invalid item_id" });
+  if (!itemId) return res.status(400).json({ error: 'Invalid item_id' });
 
   const result = await prisma.wishlistItem.deleteMany({
     where: { itemId, userId: req.user.id },
   });
 
   if (result.count === 0) {
-    return res.status(404).json({ error: "Wishlist item not found" });
+    return res.status(404).json({ error: 'Wishlist item not found' });
   }
 
-  return res.json({ message: "Wishlist item deleted successfully" });
+  return res.json({ message: 'Wishlist item deleted successfully' });
 });
 
 module.exports = router;

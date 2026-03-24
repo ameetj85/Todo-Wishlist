@@ -1,34 +1,34 @@
-"use strict";
+'use strict';
 
-require("dotenv").config();
+require('dotenv').config();
 
-const express = require("express");
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
-const config = require("./src/config");
-const authRoutes = require("./src/routes/auth");
-const adminRoutes = require("./src/routes/admin");
-const todoRoutes = require("./src/routes/todo");
-const wishlistRoutes = require("./src/routes/wishlist");
+const express = require('express');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const config = require('./src/config');
+const authRoutes = require('./src/routes/auth');
+const adminRoutes = require('./src/routes/admin');
+const todoRoutes = require('./src/routes/todo');
+const wishlistRoutes = require('./src/routes/wishlist');
 
 const app = express();
-const isDevelopment = config.server.env !== "production";
+const isDevelopment = config.server.env !== 'production';
 
 // ─── Security & Parsing ───────────────────────────────────────────────────────
 app.use(helmet());
-app.use(express.json({ limit: "8mb" }));
-app.use(express.urlencoded({ extended: true, limit: "8mb" }));
-app.set("trust proxy", 1);
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '8mb' }));
+app.set('trust proxy', 1);
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 app.use(
   rateLimit({
     ...config.rateLimit.global,
     max: isDevelopment ? Math.max(config.rateLimit.global.max, 1000) : config.rateLimit.global.max,
-    skip: (req) => req.path.startsWith("/api/auth/"),
+    skip: (req) => req.path.startsWith('/api/auth/'),
     standardHeaders: true,
     legacyHeaders: false,
-    message: { error: "Too many requests, please try again later" },
+    message: { error: 'Too many requests, please try again later' },
   }),
 );
 
@@ -38,22 +38,22 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many auth attempts, please try again later" },
+  message: { error: 'Too many auth attempts, please try again later' },
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/auth/signup", authLimiter);
-app.use("/api/auth/login", authLimiter);
-app.use("/api/auth/forgot-password", authLimiter);
-app.use("/api/auth/reset-password", authLimiter);
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/todos", todoRoutes);
-app.use("/api/wishlist", wishlistRoutes);
+app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/todos', todoRoutes);
+app.use('/api/wishlist', wishlistRoutes);
 
-app.get("/health", (req, res) => {
+app.get('/health', (req, res) => {
   res.json({
-    status: "ok",
+    status: 'ok',
     timestamp: new Date().toISOString(),
     env: config.server.env,
   });
@@ -66,13 +66,13 @@ app.use((req, res) => {
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  if (err?.type === "entity.too.large") {
-    return res.status(413).json({ error: "Request payload too large (max 8MB)" });
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request payload too large (max 8MB)' });
   }
 
   console.error(err.stack);
   res.status(500).json({
-    error: config.server.isProd ? "Internal server error" : err.message,
+    error: config.server.isProd ? 'Internal server error' : err.message,
   });
 });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -745,9 +746,12 @@ export function AdminConsoleTabs({ users, todos, wishlists }: AdminConsoleTabsPr
                   </span>
                 </div>
                 {wishlistForm.item_image ? (
-                  <img
+                  <Image
                     src={`data:image/png;base64,${wishlistForm.item_image}`}
                     alt="Wishlist preview"
+                    width={96}
+                    height={96}
+                    unoptimized
                     className="mt-2 h-24 w-24 rounded border border-border object-cover"
                   />
                 ) : null}

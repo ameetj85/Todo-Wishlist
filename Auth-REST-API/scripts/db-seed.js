@@ -1,74 +1,74 @@
 #!/usr/bin/env node
-"use strict";
+'use strict';
 // npm run db:seed
 // Inserts sample users for development/testing.
 
-require("dotenv").config();
-const bcrypt = require("bcryptjs");
-const { v4: uuidv4 } = require("uuid");
-const { prisma } = require("../src/db/prisma");
-const { toSqliteDateOnly } = require("../src/utils/dates");
-const config = require("../src/config");
+require('dotenv').config();
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
+const { prisma } = require('../src/db/prisma');
+const { toSqliteDateOnly } = require('../src/utils/dates');
+const config = require('../src/config');
 
 const SEED_USERS = [
-  { email: "admin@example.com", name: "Admin User", password: "AdminPass1" },
-  { email: "alice@example.com", name: "Alice Smith", password: "AlicePass1" },
-  { email: "bob@example.com", name: "Bob Jones", password: "BobPass123" },
-  { email: "ameetj85@gmail.com", name: "Ameet Jayawant", password: "Welcome1*", isAdmin:true }
+  { email: 'admin@example.com', name: 'Admin User', password: 'AdminPass1' },
+  { email: 'alice@example.com', name: 'Alice Smith', password: 'AlicePass1' },
+  { email: 'bob@example.com', name: 'Bob Jones', password: 'BobPass123' },
+  { email: 'ameetj85@gmail.com', name: 'Ameet Jayawant', password: 'Welcome1*', isAdmin:true }
 ];
 
-const TODO_CATEGORIES = ["Work", "Personal", "Health", "Finance", "Learning"];
+const TODO_CATEGORIES = ['Work', 'Personal', 'Health', 'Finance', 'Learning'];
 const TODO_NAMES = [
-  "Finish report",
-  "Pay utility bill",
-  "Grocery shopping",
-  "Team follow-up",
-  "Workout session",
-  "Read documentation",
-  "Plan weekly tasks",
-  "Book appointment",
+  'Finish report',
+  'Pay utility bill',
+  'Grocery shopping',
+  'Team follow-up',
+  'Workout session',
+  'Read documentation',
+  'Plan weekly tasks',
+  'Book appointment',
 ];
 
 const TODO_DESCRIPTIONS = [
-  "Complete and review before end of day",
-  "Double-check details and submit",
-  "Prepare required items and confirm schedule",
-  "Track progress and update status",
-  "Set reminders for pending steps",
-  "Close all open action items",
+  'Complete and review before end of day',
+  'Double-check details and submit',
+  'Prepare required items and confirm schedule',
+  'Track progress and update status',
+  'Set reminders for pending steps',
+  'Close all open action items',
 ];
 
 const WISHLIST_TITLES = [
-  "Mechanical keyboard",
-  "Noise-canceling headphones",
-  "Standing desk",
-  "4K monitor",
-  "Travel backpack",
-  "Fitness tracker",
-  "Espresso machine",
-  "Bluetooth speaker",
-  "Smart desk lamp",
-  "Running shoes",
+  'Mechanical keyboard',
+  'Noise-canceling headphones',
+  'Standing desk',
+  '4K monitor',
+  'Travel backpack',
+  'Fitness tracker',
+  'Espresso machine',
+  'Bluetooth speaker',
+  'Smart desk lamp',
+  'Running shoes',
 ];
 
 const WISHLIST_DESCRIPTIONS = [
-  "Save for next quarter purchase",
-  "Compare prices across vendors",
-  "Need this for improving daily workflow",
-  "Potential gift idea",
-  "Research completed, waiting for discount",
-  "Useful for home office setup",
+  'Save for next quarter purchase',
+  'Compare prices across vendors',
+  'Need this for improving daily workflow',
+  'Potential gift idea',
+  'Research completed, waiting for discount',
+  'Useful for home office setup',
 ];
 
 const WISHLIST_URLS = [
-  "https://example.com/products/keyboard",
-  "https://example.com/products/headphones",
-  "https://example.com/products/desk",
-  "https://example.com/products/monitor",
-  "https://example.com/products/backpack",
-  "https://example.com/products/tracker",
-  "https://example.com/products/speaker",
-  "https://example.com/products/lamp",
+  'https://example.com/products/keyboard',
+  'https://example.com/products/headphones',
+  'https://example.com/products/desk',
+  'https://example.com/products/monitor',
+  'https://example.com/products/backpack',
+  'https://example.com/products/tracker',
+  'https://example.com/products/speaker',
+  'https://example.com/products/lamp',
   null,
   null,
 ];
@@ -88,7 +88,7 @@ function randomDueDateOrNull() {
 async function seedTodos() {
   const users = await prisma.user.findMany({ select: { id: true, name: true } });
   if (users.length === 0) {
-    console.log("   Skipped todo seeding (no users found)");
+    console.log('   Skipped todo seeding (no users found)');
     return;
   }
 
@@ -123,7 +123,7 @@ async function seedTodos() {
 async function seedWishlists() {
   const users = await prisma.user.findMany({ select: { id: true, name: true } });
   if (users.length === 0) {
-    console.log("   Skipped wishlist seeding (no users found)");
+    console.log('   Skipped wishlist seeding (no users found)');
     return;
   }
 
@@ -163,7 +163,7 @@ async function seedWishlists() {
 }
 
 async function seed() {
-  console.log("Seeding database with sample users...\n");
+  console.log('Seeding database with sample users...\n');
 
   for (const u of SEED_USERS) {
     const existing = await prisma.user.findUnique({
@@ -192,13 +192,13 @@ async function seed() {
     console.log(`   Created: ${u.email}  (password: ${u.password})`);
   }
 
-  console.log("\nSeeding todos for users...\n");
+  console.log('\nSeeding todos for users...\n');
   await seedTodos();
 
-  console.log("\nSeeding wishlists for users...\n");
+  console.log('\nSeeding wishlists for users...\n');
   await seedWishlists();
 
-  console.log("\nDone.");
+  console.log('\nDone.');
 }
 
 seed()

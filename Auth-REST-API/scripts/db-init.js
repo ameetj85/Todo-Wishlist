@@ -8,7 +8,7 @@ const { prisma, getDatabaseUrl } = require('../src/db/prisma');
 
 async function main() {
 	const tableRows = await prisma.$queryRawUnsafe(
-		"SELECT name FROM sqlite_master WHERE type='table' ORDER BY name",
+		'SELECT name FROM sqlite_master WHERE type=\'table\' ORDER BY name',
 	);
 	console.log('✅ Database initialized successfully.');
 	console.log('   Tables:', tableRows.map((t) => t.name).join(', '));

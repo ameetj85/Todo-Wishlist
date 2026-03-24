@@ -1,12 +1,12 @@
-"use strict";
+'use strict';
 
-const express = require("express");
-const bcrypt = require("bcryptjs");
-const { v4: uuidv4 } = require("uuid");
-const { prisma } = require("../db/prisma");
-const { requireAuth } = require("../middleware/auth");
-const config = require("../config");
-const { validatePassword } = require("../validators");
+const express = require('express');
+const bcrypt = require('bcryptjs');
+const { v4: uuidv4 } = require('uuid');
+const { prisma } = require('../db/prisma');
+const { requireAuth } = require('../middleware/auth');
+const config = require('../config');
+const { validatePassword } = require('../validators');
 
 const router = express.Router();
 
@@ -24,12 +24,12 @@ function parseInteger(value, fieldName, { min = null } = {}) {
 }
 
 function parsePrice(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return { error: "price must be a number" };
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return { error: 'price must be a number' };
   }
 
   if (value < 0) {
-    return { error: "price must be greater than or equal to 0" };
+    return { error: 'price must be greater than or equal to 0' };
   }
 
   return { value };
@@ -38,15 +38,15 @@ function parsePrice(value) {
 function parseOptionalImageBlob(itemImage) {
   if (itemImage === null) return { blob: null };
 
-  if (typeof itemImage !== "string") {
-    return { error: "item_image must be a base64 string or null" };
+  if (typeof itemImage !== 'string') {
+    return { error: 'item_image must be a base64 string or null' };
   }
 
   try {
-    const blob = Buffer.from(itemImage, "base64");
+    const blob = Buffer.from(itemImage, 'base64');
     return { blob };
   } catch {
-    return { error: "item_image must be a valid base64 string" };
+    return { error: 'item_image must be a valid base64 string' };
   }
 }
 
@@ -54,11 +54,11 @@ function toAdminWishlistResponse(item) {
   return {
     item_id: item.itemId,
     user_id: item.userId,
-    user_name: item.user?.name ?? "Unknown",
+    user_name: item.user?.name ?? 'Unknown',
     title: item.title,
     description: item.description,
     url: item.url,
-    item_image: item.itemImage ? Buffer.from(item.itemImage).toString("base64") : null,
+    item_image: item.itemImage ? Buffer.from(item.itemImage).toString('base64') : null,
     price: item.price,
     quantity: item.quantity,
     priority: item.priority,
@@ -72,29 +72,29 @@ router.use(requireAuth);
 
 router.use((req, res, next) => {
   if (!req.user.isAdmin) {
-    return res.status(403).json({ error: "Admin access required" });
+    return res.status(403).json({ error: 'Admin access required' });
   }
 
   next();
 });
 
-router.post("/users", async (req, res) => {
+router.post('/users', async (req, res) => {
   const { email, name, password, is_verified, is_admin } = req.body;
 
-  const normalizedEmail = String(email ?? "").toLowerCase().trim();
-  const trimmedName = String(name ?? "").trim();
-  const rawPassword = String(password ?? "");
+  const normalizedEmail = String(email ?? '').toLowerCase().trim();
+  const trimmedName = String(name ?? '').trim();
+  const rawPassword = String(password ?? '');
 
   if (!normalizedEmail) {
-    return res.status(400).json({ error: "email is required" });
+    return res.status(400).json({ error: 'email is required' });
   }
 
   if (!trimmedName) {
-    return res.status(400).json({ error: "name is required" });
+    return res.status(400).json({ error: 'name is required' });
   }
 
   if (!rawPassword) {
-    return res.status(400).json({ error: "password is required" });
+    return res.status(400).json({ error: 'password is required' });
   }
 
   const passwordError = validatePassword(rawPassword);
@@ -108,7 +108,7 @@ router.post("/users", async (req, res) => {
   });
 
   if (existing) {
-    return res.status(409).json({ error: "A user with this email already exists" });
+    return res.status(409).json({ error: 'A user with this email already exists' });
   }
 
   const hash = await bcrypt.hash(rawPassword, config.bcrypt.saltRounds);
@@ -144,12 +144,12 @@ router.post("/users", async (req, res) => {
   });
 });
 
-router.put("/users/:userId", async (req, res) => {
+router.put('/users/:userId', async (req, res) => {
   const { userId } = req.params;
   const { email, name, password, is_verified, is_admin } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ error: "userId is required" });
+    return res.status(400).json({ error: 'userId is required' });
   }
 
   const existingUser = await prisma.user.findUnique({
@@ -158,7 +158,7 @@ router.put("/users/:userId", async (req, res) => {
   });
 
   if (!existingUser) {
-    return res.status(404).json({ error: "User not found" });
+    return res.status(404).json({ error: 'User not found' });
   }
 
   const data = {};
@@ -167,7 +167,7 @@ router.put("/users/:userId", async (req, res) => {
     const normalizedEmail = String(email).toLowerCase().trim();
 
     if (!normalizedEmail) {
-      return res.status(400).json({ error: "email must be a non-empty string" });
+      return res.status(400).json({ error: 'email must be a non-empty string' });
     }
 
     if (normalizedEmail !== existingUser.email) {
@@ -177,7 +177,7 @@ router.put("/users/:userId", async (req, res) => {
       });
 
       if (duplicate) {
-        return res.status(409).json({ error: "A user with this email already exists" });
+        return res.status(409).json({ error: 'A user with this email already exists' });
       }
     }
 
@@ -188,7 +188,7 @@ router.put("/users/:userId", async (req, res) => {
     const trimmedName = String(name).trim();
 
     if (!trimmedName) {
-      return res.status(400).json({ error: "name must be a non-empty string" });
+      return res.status(400).json({ error: 'name must be a non-empty string' });
     }
 
     data.name = trimmedName;
@@ -214,7 +214,7 @@ router.put("/users/:userId", async (req, res) => {
   }
 
   if (Object.keys(data).length === 0) {
-    return res.status(400).json({ error: "At least one updatable field is required" });
+    return res.status(400).json({ error: 'At least one updatable field is required' });
   }
 
   const user = await prisma.user.update({
@@ -242,11 +242,11 @@ router.put("/users/:userId", async (req, res) => {
   });
 });
 
-router.put("/wishlists/:itemId", async (req, res) => {
+router.put('/wishlists/:itemId', async (req, res) => {
   const itemId = parseItemId(req.params.itemId);
 
   if (!itemId) {
-    return res.status(400).json({ error: "Invalid item_id" });
+    return res.status(400).json({ error: 'Invalid item_id' });
   }
 
   const {
@@ -269,7 +269,7 @@ router.put("/wishlists/:itemId", async (req, res) => {
     const userId = String(user_id).trim();
 
     if (!userId) {
-      return res.status(400).json({ error: "user_id must be a non-empty string" });
+      return res.status(400).json({ error: 'user_id must be a non-empty string' });
     }
 
     const user = await prisma.user.findUnique({
@@ -278,29 +278,29 @@ router.put("/wishlists/:itemId", async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ error: "user_id must reference an existing user" });
+      return res.status(400).json({ error: 'user_id must reference an existing user' });
     }
 
     data.userId = userId;
   }
 
   if (title !== undefined) {
-    if (typeof title !== "string" || !title.trim()) {
-      return res.status(400).json({ error: "title must be a non-empty string" });
+    if (typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json({ error: 'title must be a non-empty string' });
     }
     data.title = title.trim();
   }
 
   if (description !== undefined) {
-    if (description !== null && typeof description !== "string") {
-      return res.status(400).json({ error: "description must be a string or null" });
+    if (description !== null && typeof description !== 'string') {
+      return res.status(400).json({ error: 'description must be a string or null' });
     }
     data.description = description;
   }
 
   if (url !== undefined) {
-    if (url !== null && typeof url !== "string") {
-      return res.status(400).json({ error: "url must be a string or null" });
+    if (url !== null && typeof url !== 'string') {
+      return res.status(400).json({ error: 'url must be a string or null' });
     }
     data.url = url;
   }
@@ -320,40 +320,40 @@ router.put("/wishlists/:itemId", async (req, res) => {
   }
 
   if (quantity !== undefined) {
-    const quantityErr = parseInteger(quantity, "quantity", { min: 1 });
+    const quantityErr = parseInteger(quantity, 'quantity', { min: 1 });
     if (quantityErr) return res.status(400).json({ error: quantityErr });
     data.quantity = quantity;
   }
 
   if (priority !== undefined) {
     if (![0, 1, 2].includes(priority)) {
-      return res.status(400).json({ error: "priority must be one of 0, 1, or 2" });
+      return res.status(400).json({ error: 'priority must be one of 0, 1, or 2' });
     }
     data.priority = priority;
   }
 
   if (purchased !== undefined) {
-    if (typeof purchased !== "boolean") {
-      return res.status(400).json({ error: "purchased must be a boolean" });
+    if (typeof purchased !== 'boolean') {
+      return res.status(400).json({ error: 'purchased must be a boolean' });
     }
     data.purchased = purchased;
   }
 
   if (sequence !== undefined) {
-    const sequenceErr = parseInteger(sequence, "sequence", { min: 0 });
+    const sequenceErr = parseInteger(sequence, 'sequence', { min: 0 });
     if (sequenceErr) return res.status(400).json({ error: sequenceErr });
     data.sequence = sequence;
   }
 
   if (created_date !== undefined) {
-    if (typeof created_date !== "string" || !created_date.trim()) {
-      return res.status(400).json({ error: "created_date must be a non-empty string" });
+    if (typeof created_date !== 'string' || !created_date.trim()) {
+      return res.status(400).json({ error: 'created_date must be a non-empty string' });
     }
     data.createdDate = created_date.trim();
   }
 
   if (Object.keys(data).length === 0) {
-    return res.status(400).json({ error: "At least one updatable field is required" });
+    return res.status(400).json({ error: 'At least one updatable field is required' });
   }
 
   try {
@@ -371,14 +371,14 @@ router.put("/wishlists/:itemId", async (req, res) => {
 
     return res.json({ wishlist: toAdminWishlistResponse(wishlistItem) });
   } catch {
-    return res.status(404).json({ error: "Wishlist item not found" });
+    return res.status(404).json({ error: 'Wishlist item not found' });
   }
 });
 
-router.get("/overview", async (_req, res) => {
+router.get('/overview', async (_req, res) => {
   const [users, todos, wishlists] = await Promise.all([
     prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         email: true,
@@ -389,7 +389,7 @@ router.get("/overview", async (_req, res) => {
       },
     }),
     prisma.todo.findMany({
-      orderBy: [{ createdDate: "desc" }, { todoId: "desc" }],
+      orderBy: [{ createdDate: 'desc' }, { todoId: 'desc' }],
       select: {
         todoId: true,
         userId: true,
@@ -407,7 +407,7 @@ router.get("/overview", async (_req, res) => {
       },
     }),
     prisma.wishlistItem.findMany({
-      orderBy: [{ createdDate: "desc" }, { itemId: "desc" }],
+      orderBy: [{ createdDate: 'desc' }, { itemId: 'desc' }],
       select: {
         itemId: true,
         userId: true,
@@ -442,7 +442,7 @@ router.get("/overview", async (_req, res) => {
     todos: todos.map((todo) => ({
       todo_id: todo.todoId,
       user_id: todo.userId,
-      user_name: todo.user?.name ?? "Unknown",
+      user_name: todo.user?.name ?? 'Unknown',
       name: todo.name,
       description: todo.description,
       due_date: todo.dueDate,

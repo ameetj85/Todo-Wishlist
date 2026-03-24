@@ -1,9 +1,9 @@
-"use strict";
+'use strict';
 
-const express = require("express");
-const { prisma } = require("../db/prisma");
-const { requireAuth } = require("../middleware/auth");
-const { toSqliteDateOnly } = require("../utils/dates");
+const express = require('express');
+const { prisma } = require('../db/prisma');
+const { requireAuth } = require('../middleware/auth');
+const { toSqliteDateOnly } = require('../utils/dates');
 
 const router = express.Router();
 
@@ -38,7 +38,7 @@ function isValidDateTime(value) {
   return !Number.isNaN(Date.parse(value));
 }
 
-router.post("/", async (req, res) => {
+router.post('/', async (req, res) => {
   const {
     name,
     description,
@@ -50,45 +50,45 @@ router.post("/", async (req, res) => {
     reminder_sent,
   } = req.body;
 
-  if (!name || typeof name !== "string" || !name.trim()) {
-    return res.status(400).json({ error: "name is required" });
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
   }
-  if (!description || typeof description !== "string" || !description.trim()) {
-    return res.status(400).json({ error: "description is required" });
+  if (!description || typeof description !== 'string' || !description.trim()) {
+    return res.status(400).json({ error: 'description is required' });
   }
-  if (!category || typeof category !== "string" || !category.trim()) {
-    return res.status(400).json({ error: "category is required" });
+  if (!category || typeof category !== 'string' || !category.trim()) {
+    return res.status(400).json({ error: 'category is required' });
   }
   if (
     due_date !== undefined &&
     due_date !== null &&
-    (typeof due_date !== "string" || !isValidDate(due_date))
+    (typeof due_date !== 'string' || !isValidDate(due_date))
   ) {
     return res
       .status(400)
-      .json({ error: "due_date must be in YYYY-MM-DD format" });
+      .json({ error: 'due_date must be in YYYY-MM-DD format' });
   }
-  if (completed !== undefined && typeof completed !== "boolean") {
-    return res.status(400).json({ error: "completed must be a boolean" });
+  if (completed !== undefined && typeof completed !== 'boolean') {
+    return res.status(400).json({ error: 'completed must be a boolean' });
   }
-  if (remind_me !== undefined && typeof remind_me !== "boolean") {
-    return res.status(400).json({ error: "remind_me must be a boolean" });
+  if (remind_me !== undefined && typeof remind_me !== 'boolean') {
+    return res.status(400).json({ error: 'remind_me must be a boolean' });
   }
   if (
     reminder_date !== undefined &&
     reminder_date !== null &&
-    (typeof reminder_date !== "string" || !isValidDateTime(reminder_date))
+    (typeof reminder_date !== 'string' || !isValidDateTime(reminder_date))
   ) {
     return res
       .status(400)
-      .json({ error: "reminder_date must be null or a valid datetime" });
+      .json({ error: 'reminder_date must be null or a valid datetime' });
   }
-  if (reminder_sent !== undefined && typeof reminder_sent !== "boolean") {
-    return res.status(400).json({ error: "reminder_sent must be a boolean" });
+  if (reminder_sent !== undefined && typeof reminder_sent !== 'boolean') {
+    return res.status(400).json({ error: 'reminder_sent must be a boolean' });
   }
   if (reminder_sent === true && (reminder_date ?? null) === null) {
     return res.status(400).json({
-      error: "reminder_date is required when reminder_sent is true",
+      error: 'reminder_date is required when reminder_sent is true',
     });
   }
 
@@ -110,9 +110,9 @@ router.post("/", async (req, res) => {
   return res.status(201).json({ todo: toTodoResponse(todo) });
 });
 
-router.get("/", async (req, res) => {
+router.get('/', async (req, res) => {
   const dueTodayOrOverdueOpenOnly =
-    req.query.due_today_open === "1" || req.query.due_today_open === "true";
+    req.query.due_today_open === '1' || req.query.due_today_open === 'true';
 
   const where = { userId: req.user.id };
 
@@ -126,27 +126,27 @@ router.get("/", async (req, res) => {
 
   const todos = await prisma.todo.findMany({
     where,
-    orderBy: [{ createdDate: "desc" }, { todoId: "desc" }],
+    orderBy: [{ createdDate: 'desc' }, { todoId: 'desc' }],
   });
 
   return res.json({ todos: todos.map(toTodoResponse) });
 });
 
-router.get("/:todoId", async (req, res) => {
+router.get('/:todoId', async (req, res) => {
   const todoId = parseTodoId(req.params.todoId);
-  if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
+  if (!todoId) return res.status(400).json({ error: 'Invalid todo_id' });
 
   const todo = await prisma.todo.findFirst({
     where: { todoId, userId: req.user.id },
   });
 
-  if (!todo) return res.status(404).json({ error: "Todo not found" });
+  if (!todo) return res.status(404).json({ error: 'Todo not found' });
   return res.json({ todo: toTodoResponse(todo) });
 });
 
-router.put("/", async (req, res) => {
+router.put('/', async (req, res) => {
   const todoId = parseTodoId(req.body.todo_id);
-  if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
+  if (!todoId) return res.status(400).json({ error: 'Invalid todo_id' });
 
   const {
     name,
@@ -161,61 +161,61 @@ router.put("/", async (req, res) => {
   const data = {};
 
   if (name !== undefined) {
-    if (typeof name !== "string" || !name.trim())
-      return res.status(400).json({ error: "name must be a non-empty string" });
+    if (typeof name !== 'string' || !name.trim())
+      return res.status(400).json({ error: 'name must be a non-empty string' });
     data.name = name.trim();
   }
   if (description !== undefined) {
-    if (typeof description !== "string" || !description.trim())
+    if (typeof description !== 'string' || !description.trim())
       return res
         .status(400)
-        .json({ error: "description must be a non-empty string" });
+        .json({ error: 'description must be a non-empty string' });
     data.description = description.trim();
   }
   if (category !== undefined) {
-    if (typeof category !== "string" || !category.trim())
+    if (typeof category !== 'string' || !category.trim())
       return res
         .status(400)
-        .json({ error: "category must be a non-empty string" });
+        .json({ error: 'category must be a non-empty string' });
     data.category = category.trim();
   }
   if (due_date !== undefined) {
     if (
       due_date !== null &&
-      (typeof due_date !== "string" || !isValidDate(due_date))
+      (typeof due_date !== 'string' || !isValidDate(due_date))
     ) {
       return res
         .status(400)
-        .json({ error: "due_date must be null or YYYY-MM-DD format" });
+        .json({ error: 'due_date must be null or YYYY-MM-DD format' });
     }
     data.dueDate = due_date;
   }
   if (completed !== undefined) {
-    if (typeof completed !== "boolean")
-      return res.status(400).json({ error: "completed must be a boolean" });
+    if (typeof completed !== 'boolean')
+      return res.status(400).json({ error: 'completed must be a boolean' });
     data.completed = completed;
   }
   if (remind_me !== undefined) {
-    if (typeof remind_me !== "boolean")
-      return res.status(400).json({ error: "remind_me must be a boolean" });
+    if (typeof remind_me !== 'boolean')
+      return res.status(400).json({ error: 'remind_me must be a boolean' });
     data.remindMe = remind_me;
   }
   if (reminder_date !== undefined) {
     if (
       reminder_date !== null &&
-      (typeof reminder_date !== "string" || !isValidDateTime(reminder_date))
+      (typeof reminder_date !== 'string' || !isValidDateTime(reminder_date))
     ) {
       return res
         .status(400)
-        .json({ error: "reminder_date must be null or a valid datetime" });
+        .json({ error: 'reminder_date must be null or a valid datetime' });
     }
     data.reminderDate = reminder_date;
   }
   if (reminder_sent !== undefined) {
-    if (typeof reminder_sent !== "boolean")
+    if (typeof reminder_sent !== 'boolean')
       return res
         .status(400)
-        .json({ error: "reminder_sent must be a boolean" });
+        .json({ error: 'reminder_sent must be a boolean' });
     data.reminderSent = reminder_sent;
   }
 
@@ -229,7 +229,7 @@ router.put("/", async (req, res) => {
     });
 
     if (!existingTodo) {
-      return res.status(404).json({ error: "Todo not found" });
+      return res.status(404).json({ error: 'Todo not found' });
     }
 
     const nextReminderSent =
@@ -239,7 +239,7 @@ router.put("/", async (req, res) => {
 
     if (nextReminderSent === true && nextReminderDate === null) {
       return res.status(400).json({
-        error: "reminder_date is required when reminder_sent is true",
+        error: 'reminder_date is required when reminder_sent is true',
       });
     }
   }
@@ -247,7 +247,7 @@ router.put("/", async (req, res) => {
   if (Object.keys(data).length === 0) {
     return res
       .status(400)
-      .json({ error: "At least one updatable field is required" });
+      .json({ error: 'At least one updatable field is required' });
   }
 
   const result = await prisma.todo.updateMany({
@@ -256,7 +256,7 @@ router.put("/", async (req, res) => {
   });
 
   if (result.count === 0)
-    return res.status(404).json({ error: "Todo not found" });
+    return res.status(404).json({ error: 'Todo not found' });
 
   const todo = await prisma.todo.findFirst({
     where: { todoId, userId: req.user.id },
@@ -265,17 +265,17 @@ router.put("/", async (req, res) => {
   return res.json({ todo: toTodoResponse(todo) });
 });
 
-router.delete("/:todoId", async (req, res) => {
+router.delete('/:todoId', async (req, res) => {
   const todoId = parseTodoId(req.params.todoId);
-  if (!todoId) return res.status(400).json({ error: "Invalid todo_id" });
+  if (!todoId) return res.status(400).json({ error: 'Invalid todo_id' });
 
   const result = await prisma.todo.deleteMany({
     where: { todoId, userId: req.user.id },
   });
 
   if (result.count === 0)
-    return res.status(404).json({ error: "Todo not found" });
-  return res.json({ message: "Todo deleted successfully" });
+    return res.status(404).json({ error: 'Todo not found' });
+  return res.json({ message: 'Todo deleted successfully' });
 });
 
 module.exports = router;

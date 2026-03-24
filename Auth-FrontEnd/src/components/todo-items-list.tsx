@@ -220,8 +220,6 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     setIsSubmittingTodo(true);
 
     const isEdit = todoDialogMode === "edit" && activeTodoId !== null;
-    const endpoint = isEdit ? `/api/todos/${activeTodoId}` : "/api/todos";
-    const method = isEdit ? "PUT" : "POST";
 
     const actionResult = isEdit
       ? await updateTodoAction(activeTodoId, {

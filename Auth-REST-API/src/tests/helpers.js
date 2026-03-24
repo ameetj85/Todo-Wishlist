@@ -1,6 +1,6 @@
-"use strict";
+'use strict';
 
-const { prisma } = require("../db/prisma");
+const { prisma } = require('../db/prisma');
 
 async function resetDb() {
   await prisma.user.deleteMany();
@@ -17,7 +17,7 @@ function getSession(token) {
 function getResetToken(userId) {
   return prisma.passwordResetToken.findFirst({
     where: { userId },
-    orderBy: { createdAt: "desc" },
+    orderBy: { createdAt: 'desc' },
   });
 }
 
