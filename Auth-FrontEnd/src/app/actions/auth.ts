@@ -10,6 +10,7 @@ import {
   logout,
   resetPassword,
   signup,
+  verifyEmail,
 } from "@/lib/auth-api";
 import { clearAuthToken, getAuthToken, setAuthToken } from "@/lib/auth-cookie";
 
@@ -67,11 +68,28 @@ export async function signupAction(
     return { error: response.error };
   }
 
-  await setAuthToken(response.data.token, response.data.expiresIn);
   revalidatePath("/");
-  revalidatePath("/about");
+  redirect("/verify-email-sent");
+}
 
-  redirect("/about");
+export async function verifyEmailAction(
+  _: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const token = String(formData.get("token") ?? "").trim();
+
+  if (!token) {
+    return { error: "Verification token is required" };
+  }
+
+  const response = await verifyEmail({ token });
+
+  if (!response.ok) {
+    return { error: response.error };
+  }
+
+  revalidatePath("/");
+  redirect("/login");
 }
 
 export async function logoutAction() {

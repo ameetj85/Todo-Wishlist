@@ -5,7 +5,7 @@ const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../db/prisma');
 const { requireAuth } = require('../middleware/auth');
-const { sendPasswordResetEmail } = require('../utils/email');
+const { sendPasswordResetEmail, sendVerificationEmail } = require('../utils/email');
 const { toSqliteDate } = require('../utils/dates');
 const config = require('../config');
 const { validateSignup, validateLogin, validatePassword } = require('../validators');
@@ -66,13 +66,29 @@ router.post('/signup', async (req, res) => {
     },
   });
 
-  const token = await createSession(userId, req);
+  // Generate verification token (re-using password_reset_tokens table)
+  const verificationToken = uuidv4();
+  await prisma.passwordResetToken.create({
+    data: {
+      id: uuidv4(),
+      userId: userId,
+      token: verificationToken,
+      expiresAt: resetTokenExpiry(),
+    },
+  });
+
+  // Send verification email
+  try {
+    await sendVerificationEmail(normalizedEmail, name.trim(), verificationToken);
+    console.log(`Verification email sent to ${normalizedEmail}`);
+  } catch (e) {
+    console.error('[email] Failed to send verification email:', e.message);
+    // Still consider signup successful even if email fails
+  }
 
   return res.status(201).json({
-    message: 'Account created successfully',
-    token,
-    expiresIn: `${config.session.expiryHours}h`,
-    user: { id: userId, email: normalizedEmail, name: name.trim() },
+    message: 'Account created successfully. Please check your email to verify your account.',
+    requiresVerification: true,
   });
 });
 
@@ -299,6 +315,58 @@ router.post('/change-password', requireAuth, async (req, res) => {
   ]);
 
   return res.json({ message: 'Password changed successfully' });
+});
+
+// Compatibility route: old verification links may target the API endpoint via GET.
+router.get('/verify-email', async (req, res) => {
+  const token = String(req.query.token ?? '').trim();
+  const appUrl = String(config.passwordReset.appUrl ?? '').replace(/\/$/, '');
+
+  if (!appUrl) {
+    return res.status(500).json({ error: 'Missing APP_URL configuration' });
+  }
+
+  if (!token) {
+    return res.redirect(`${appUrl}/verify-email`);
+  }
+
+  return res.redirect(`${appUrl}/verify-email?token=${encodeURIComponent(token)}`);
+});
+
+router.post('/verify-email', async (req, res) => {
+  const { token } = req.body;
+  if (!token) {
+    return res.status(400).json({ error: 'token is required' });
+  }
+
+  const record = await prisma.passwordResetToken.findFirst({
+    where: {
+      token,
+      used: false,
+      expiresAt: { gt: toSqliteDate(Date.now()) },
+    },
+  });
+
+  if (!record) {
+    return res.status(400).json({ error: 'Invalid or expired verification token' });
+  }
+
+  // Mark token as used and set user as verified
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.userId },
+      data: {
+        isVerified: true,
+        updatedAt: toSqliteDate(Date.now()),
+      },
+    }),
+    prisma.passwordResetToken.update({
+      where: { id: record.id },
+      data: { used: true },
+    }),
+  ]);
+
+  return res.json({ message: 'Email verified successfully. You can now log in.' });
 });
 
 module.exports = router;

@@ -157,6 +157,13 @@ export function resetPassword(payload: { token: string; password: string }) {
   });
 }
 
+export function verifyEmail(payload: { token: string }) {
+  return request<{ message: string }>("/verify-email", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function changePassword(
   payload: { current_password: string; new_password: string },
   token: string,

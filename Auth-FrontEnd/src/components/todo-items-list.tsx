@@ -75,6 +75,7 @@ function toIsoDateTimeOrNull(value: string) {
 export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
   const [todos, setTodos] = useState(initialTodos);
   const [error, setError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [todoDialogMode, setTodoDialogMode] = useState<"add" | "edit" | null>(null);
@@ -148,6 +149,7 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
 
   function openAdd() {
     setError(null);
+    setDialogError(null);
     setActiveTodoId(null);
     setIsCustomCategory(false);
     resetTodoForm();
@@ -156,6 +158,7 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
 
   function openEdit(todo: TodoItem) {
     setError(null);
+    setDialogError(null);
     setActiveTodoId(todo.todo_id);
     setTodoForm({
       name: todo.name,
@@ -174,6 +177,7 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
   function closeTodoDialog() {
     setTodoDialogMode(null);
     setActiveTodoId(null);
+    setDialogError(null);
   }
 
   async function submitTodo() {
@@ -184,22 +188,22 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     const reminderDate = todoForm.reminder_date.trim();
 
     if (!name) {
-      setError("Name is required");
+      setDialogError("Name is required");
       return;
     }
 
     if (!description) {
-      setError("Description is required");
+      setDialogError("Description is required");
       return;
     }
 
     if (!category) {
-      setError("Category is required");
+      setDialogError("Category is required");
       return;
     }
 
     if (todoForm.remind_me && !reminderDate) {
-      setError("Reminder date and time is required when Remind Me is enabled");
+      setDialogError("Reminder date and time is required when Remind Me is enabled");
       return;
     }
 
@@ -208,11 +212,11 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
       : null;
 
     if (todoForm.remind_me && !reminderDateIso) {
-      setError("Reminder date and time must be valid");
+      setDialogError("Reminder date and time must be valid");
       return;
     }
 
-    setError(null);
+    setDialogError(null);
     setIsSubmittingTodo(true);
 
     const isEdit = todoDialogMode === "edit" && activeTodoId !== null;
@@ -242,7 +246,7 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
         });
 
     if (!actionResult.ok) {
-      setError(actionResult.error ?? `Unable to ${isEdit ? "update" : "create"} todo`);
+      setDialogError(actionResult.error ?? `Unable to ${isEdit ? "update" : "create"} todo`);
       setIsSubmittingTodo(false);
       return;
     }
@@ -457,12 +461,14 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
 
               <div className="space-y-1">
                 <Label htmlFor="todo-description">Description</Label>
-                <Input
+                <textarea
                   id="todo-description"
                   value={todoForm.description}
                   onChange={(event) =>
                     setTodoForm((prev) => ({ ...prev, description: event.target.value }))
                   }
+                  rows={3}
+                  className="w-full min-w-0 rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 dark:bg-input/30"
                 />
               </div>
 
@@ -553,12 +559,18 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
               </label>
 
               <div className="space-y-1">
-                <Label htmlFor="todo-reminder-date">Reminder Date & Time</Label>
+                <Label htmlFor="todo-reminder-date">
+                  Reminder Date &amp; Time
+                  {todoForm.remind_me ? (
+                    <span className="ml-1 text-destructive" aria-hidden="true">*</span>
+                  ) : null}
+                </Label>
                 <Input
                   id="todo-reminder-date"
                   type="datetime-local"
                   value={todoForm.reminder_date}
                   disabled={!todoForm.remind_me}
+                  required={todoForm.remind_me}
                   onChange={(event) =>
                     setTodoForm((prev) => ({ ...prev, reminder_date: event.target.value }))
                   }
@@ -576,6 +588,12 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
                 Mark as completed
               </label>
             </div>
+
+            {dialogError ? (
+              <div className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {dialogError}
+              </div>
+            ) : null}
 
             <div className="mt-5 flex justify-end gap-2">
               <Button
