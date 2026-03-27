@@ -19,7 +19,7 @@ type LoginFormProps = {
 };
 
 export function LoginForm({
-  nextPath = "/about",
+  nextPath = "/",
   fromHero = false,
 }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, initialState);

@@ -21,10 +21,10 @@ export type ActionState = {
 };
 
 function getSafeNextPath(value: FormDataEntryValue | null) {
-  const nextPath = typeof value === "string" ? value : "/about";
+  const nextPath = typeof value === "string" ? value : "/";
 
   if (!nextPath.startsWith("/") || nextPath.startsWith("//")) {
-    return "/about";
+    return "/";
   }
 
   return nextPath;

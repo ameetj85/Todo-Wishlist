@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,6 +74,7 @@ function toIsoDateTimeOrNull(value: string) {
 }
 
 export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
+  const router = useRouter();
   const [todos, setTodos] = useState(initialTodos);
   const [error, setError] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
@@ -264,6 +266,8 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
       setTodos((prev) => [...prev, payload.todo]);
     });
 
+    router.refresh();
+
     setIsSubmittingTodo(false);
     closeTodoDialog();
     resetTodoForm();
@@ -290,6 +294,8 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
     startTransition(() => {
       setTodos((prev) => prev.filter((todo) => todo.todo_id !== deletedTodoId));
     });
+
+    router.refresh();
 
     setDeleteTodo(null);
     setIsDeleting(false);

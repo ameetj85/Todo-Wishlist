@@ -207,8 +207,8 @@ export function AppNavbar({
               >
                 <Bell className="h-5 w-5" />
                 {dueTodayOpenTodoCount > 0 ? (
-                  <span className="absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
-                    {bellCountLabel}
+                  <span className="absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-xs font-white leading-none text-destructive-foreground font-bold">
+                    <strong>{bellCountLabel}</strong>
                   </span>
                 ) : null}
               </a>
