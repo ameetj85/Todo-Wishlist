@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { ExternalLink, Package } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -427,8 +428,8 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                   </div>
 
                   {item.url ? (
-                    <a
-                      href={normalizeItemUrl(item.url) ?? undefined}
+                    <Link
+                      href={normalizeItemUrl(item.url) ?? "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-primary hover:text-primary/80"
@@ -436,7 +437,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                     >
                       <span className="truncate">View Product</span>
                       <ExternalLink className="size-3.5 shrink-0" />
-                    </a>
+                    </Link>
                   ) : (
                     <p className="text-sm text-muted-foreground">No product link</p>
                   )}

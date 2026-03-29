@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Bell, Menu, X } from "lucide-react";
 
@@ -165,7 +166,7 @@ export function AppNavbar({
               {isMobileNavOpen ? (
                 <div className="absolute left-0 top-12 z-50 w-56 rounded-lg border border-border bg-background p-1 shadow-lg">
                   {!isAuthenticated ? (
-                    <a
+                    <Link
                       href="#"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={(event) => {
@@ -175,47 +176,47 @@ export function AppNavbar({
                       }}
                     >
                       View Wishlist
-                    </a>
+                    </Link>
                   ) : null}
 
                   {showHeroButton ? (
-                    <a
+                    <Link
                       href="/"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsMobileNavOpen(false)}
                     >
                       Home
-                    </a>
+                    </Link>
                   ) : null}
 
                   {isAuthenticated && !onTodoPage ? (
-                    <a
+                    <Link
                       href="/todo"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsMobileNavOpen(false)}
                     >
                       Todo
-                    </a>
+                    </Link>
                   ) : null}
 
                   {isAuthenticated && !onWishlistPage ? (
-                    <a
+                    <Link
                       href="/wishlist"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsMobileNavOpen(false)}
                     >
                       Wishlist
-                    </a>
+                    </Link>
                   ) : null}
 
                   {!onAboutPage ? (
-                    <a
+                    <Link
                       href="/about"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsMobileNavOpen(false)}
                     >
                       About
-                    </a>
+                    </Link>
                   ) : null}
                 </div>
               ) : null}
@@ -244,7 +245,7 @@ export function AppNavbar({
 
           <div className="hidden w-full flex-wrap items-center justify-start gap-2 md:flex md:w-auto md:justify-center">
             {!isAuthenticated ? (
-              <a
+              <Link
                 href="#"
                 className={cn(NAVBAR_LINK_CLASS_NAME, themeNavLinkClassName)}
                 onClick={(event) => {
@@ -253,7 +254,7 @@ export function AppNavbar({
                 }}
               >
                 View Wishlist
-              </a>
+              </Link>
             ) : null}
 
             {showHeroButton ? (
@@ -283,7 +284,7 @@ export function AppNavbar({
 
           <div className="flex shrink-0 items-center justify-end justify-self-end gap-2 md:w-auto">
             {showDueTodayBell ? (
-              <a
+              <Link
                 href="/todo?filter=due-today-open"
                 title="you have Todos due today or overdue"
                 aria-label={`You have ${dueTodayOpenTodoCount} todos due today or overdue`}
@@ -299,7 +300,7 @@ export function AppNavbar({
                     {bellCountLabel}
                   </span>
                 ) : null}
-              </a>
+              </Link>
             ) : null}
 
             <div className="relative" ref={profileMenuRef}>
@@ -323,51 +324,51 @@ export function AppNavbar({
               {isProfileMenuOpen ? (
                 <div className="absolute right-0 z-50 mt-2 min-w-48 rounded-lg border border-border bg-background p-1 shadow-lg">
                   {!onAboutPage ? (
-                    <a
+                    <Link
                       href="/about"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsProfileMenuOpen(false)}
                     >
                       About
-                    </a>
+                    </Link>
                   ) : null}
 
                   {isAuthenticated && !onChangePasswordPage ? (
-                    <a
+                    <Link
                       href="/change-password"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsProfileMenuOpen(false)}
                     >
                       Change Password
-                    </a>
+                    </Link>
                   ) : null}
 
                   {isAuthenticated && isAdmin && !onAdminConsolePage ? (
-                    <a
+                    <Link
                       href="/admin-console"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsProfileMenuOpen(false)}
                     >
                       Admin Console
-                    </a>
+                    </Link>
                   ) : null}
 
                   {isAuthenticated ? (
-                    <a
+                    <Link
                       href="/logout"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsProfileMenuOpen(false)}
                     >
                       Sign Out
-                    </a>
+                    </Link>
                   ) : !onLoginPage ? (
-                    <a
+                    <Link
                       href={pathname === "/" ? "/login?from=hero" : "/login"}
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
                       onClick={() => setIsProfileMenuOpen(false)}
                     >
                       Sign In
-                    </a>
+                    </Link>
                   ) : null}
                 </div>
               ) : null}
