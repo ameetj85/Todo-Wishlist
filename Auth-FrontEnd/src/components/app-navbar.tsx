@@ -3,7 +3,7 @@
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, Menu, X } from "lucide-react";
 
 import { NAVBAR_LINK_CLASS_NAME, NavbarLink } from "@/components/navbar-link";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,13 +32,16 @@ export function AppNavbar({
   const emailInputId = useId();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
   const [isWishlistModalOpen, setIsWishlistModalOpen] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [showValidationError, setShowValidationError] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [isLookingUpWishlist, setIsLookingUpWishlist] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
+  const mobileNavRef = useRef<HTMLDivElement | null>(null);
 
   const fromHero = searchParams.get("from") === "hero";
   const isHeroFlowChildRoute =
@@ -68,11 +71,16 @@ export function AppNavbar({
       if (profileMenuRef.current && !profileMenuRef.current.contains(target)) {
         setIsProfileMenuOpen(false);
       }
+
+      if (mobileNavRef.current && !mobileNavRef.current.contains(target)) {
+        setIsMobileNavOpen(false);
+      }
     }
 
     function onEscape(event: KeyboardEvent) {
       if (event.key === "Escape") {
         setIsProfileMenuOpen(false);
+        setIsMobileNavOpen(false);
       }
     }
 
@@ -84,6 +92,10 @@ export function AppNavbar({
       window.removeEventListener("keydown", onEscape);
     };
   }, []);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname, searchParamsKey]);
 
   function openWishlistModal() {
     setIsWishlistModalOpen(true);
@@ -136,8 +148,79 @@ export function AppNavbar({
   return (
     <>
       <nav className="border-b">
-        <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center px-6 py-4">
-          <div className="flex items-center justify-self-start gap-3">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-2 md:px-6 md:py-4">
+          <div className="flex min-w-0 items-center justify-self-start gap-2">
+            <div className="relative md:hidden" ref={mobileNavRef}>
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isMobileNavOpen}
+                aria-label="Open navigation menu"
+                onClick={() => setIsMobileNavOpen((prev) => !prev)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-background hover:bg-accent"
+              >
+                {isMobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+
+              {isMobileNavOpen ? (
+                <div className="absolute left-0 top-12 z-50 w-56 rounded-lg border border-border bg-background p-1 shadow-lg">
+                  {!isAuthenticated ? (
+                    <a
+                      href="#"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setIsMobileNavOpen(false);
+                        openWishlistModal();
+                      }}
+                    >
+                      View Wishlist
+                    </a>
+                  ) : null}
+
+                  {showHeroButton ? (
+                    <a
+                      href="/"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsMobileNavOpen(false)}
+                    >
+                      Home
+                    </a>
+                  ) : null}
+
+                  {isAuthenticated && !onTodoPage ? (
+                    <a
+                      href="/todo"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsMobileNavOpen(false)}
+                    >
+                      Todo
+                    </a>
+                  ) : null}
+
+                  {isAuthenticated && !onWishlistPage ? (
+                    <a
+                      href="/wishlist"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsMobileNavOpen(false)}
+                    >
+                      Wishlist
+                    </a>
+                  ) : null}
+
+                  {!onAboutPage ? (
+                    <a
+                      href="/about"
+                      className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
+                      onClick={() => setIsMobileNavOpen(false)}
+                    >
+                      About
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+
             <Image
               src="/appLogo.png"
               alt="Your Smashing Apps logo"
@@ -146,15 +229,20 @@ export function AppNavbar({
               className="rounded-md"
               priority
             />
-            <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold">Your Smashing Apps</span>
+            <div className="flex min-w-0 items-baseline gap-2">
+              <span className="text-base font-bold sm:hidden">YSA</span>
+              <span className="hidden max-w-[14rem] truncate text-lg font-bold sm:inline md:max-w-none md:text-2xl">
+                Your Smashing Apps
+              </span>
               {isAuthenticated && userName ? (
-                <span className="text-sm font-medium text-muted-foreground">({userName})</span>
+                <span className="hidden truncate text-sm font-medium text-muted-foreground sm:inline">
+                  ({userName})
+                </span>
               ) : null}
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2">
+          <div className="hidden w-full flex-wrap items-center justify-start gap-2 md:flex md:w-auto md:justify-center">
             {!isAuthenticated ? (
               <a
                 href="#"
@@ -193,7 +281,7 @@ export function AppNavbar({
             ) : null}
           </div>
 
-          <div className="flex items-center justify-self-end gap-2">
+          <div className="flex shrink-0 items-center justify-end justify-self-end gap-2 md:w-auto">
             {showDueTodayBell ? (
               <a
                 href="/todo?filter=due-today-open"

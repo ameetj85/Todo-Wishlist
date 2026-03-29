@@ -4,7 +4,7 @@ import { type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export const NAVBAR_LINK_CLASS_NAME =
-  "inline-flex h-10 w-36 items-center justify-center rounded-lg bg-blue-500 text-sm font-medium whitespace-nowrap text-white transition-all hover:bg-blue-600";
+  "inline-flex h-10 min-w-24 items-center justify-center rounded-lg bg-blue-500 px-3 text-sm font-medium whitespace-nowrap text-white transition-all hover:bg-blue-600 sm:px-4";
 
 type NavbarLinkProps = LinkProps & {
   children: ReactNode;
