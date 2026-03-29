@@ -231,7 +231,6 @@ export function AppNavbar({
               priority
             />
             <div className="flex min-w-0 items-baseline gap-2">
-              <span className="text-base font-bold sm:hidden">YSA</span>
               <span className="hidden max-w-[14rem] truncate text-lg font-bold sm:inline md:max-w-none md:text-2xl">
                 Your Smashing Apps
               </span>

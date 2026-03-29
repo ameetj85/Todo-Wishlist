@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -394,9 +395,55 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
                   </p>
                 </div>
 
-                <div className="text-sm font-medium text-muted-foreground">{todo.category}</div>
+                <div className="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 md:hidden">
+                  <span className="truncate text-xs font-medium text-muted-foreground">
+                    {todo.category}
+                  </span>
 
-                <div>
+                  {todo.completed ? (
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                      Completed
+                    </span>
+                  ) : (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                      Pending
+                    </span>
+                  )}
+
+                  <div className="ml-auto flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      className="h-8 w-8 p-0"
+                      disabled={isPending}
+                      title="Edit todo"
+                      aria-label="Edit todo"
+                      onClick={() => openEdit(todo)}
+                    >
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon-sm"
+                      className="h-8 w-8 p-0"
+                      disabled={isPending}
+                      title="Delete todo"
+                      aria-label="Delete todo"
+                      onClick={() => {
+                        setError(null);
+                        setDeleteTodo(todo);
+                      }}
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="hidden text-sm font-medium text-muted-foreground md:block">{todo.category}</div>
+
+                <div className="hidden md:block">
                   {todo.completed ? (
                     <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
                       Completed
@@ -408,29 +455,33 @@ export function TodoItemsList({ initialTodos }: TodoItemsListProps) {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="hidden items-center gap-2 md:flex">
                   <Button
                     type="button"
                     variant="outline"
                     size="icon-sm"
-                    className="h-8 w-auto px-3"
+                    className="h-8 w-8 p-0"
                     disabled={isPending}
+                    title="Edit todo"
+                    aria-label="Edit todo"
                     onClick={() => openEdit(todo)}
                   >
-                    Edit
+                    <Pencil className="size-4" />
                   </Button>
                   <Button
                     type="button"
                     variant="destructive"
                     size="icon-sm"
-                    className="h-8 w-auto px-3"
+                    className="h-8 w-8 p-0"
                     disabled={isPending}
+                    title="Delete todo"
+                    aria-label="Delete todo"
                     onClick={() => {
                       setError(null);
                       setDeleteTodo(todo);
                     }}
                   >
-                    Delete
+                    <Trash2 className="size-4" />
                   </Button>
                 </div>
               </div>

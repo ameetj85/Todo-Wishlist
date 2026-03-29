@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { ExternalLink, Package } from "lucide-react";
+import { ExternalLink, Package, Pencil, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -363,31 +363,32 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
             <span>Action</span>
           </div>
 
-          {sortedItems.map((item) => (
-            <div
-              key={item.item_id}
-              draggable={!isResequencing}
-              onDragStart={() => {
-                setDraggingItemId(item.item_id);
-              }}
-              onDragEnd={() => {
-                setDraggingItemId(null);
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-              }}
-              onDrop={(event) => {
-                event.preventDefault();
+          <div className="divide-y-2 divide-border/90">
+            {sortedItems.map((item) => (
+              <div
+                key={item.item_id}
+                draggable={!isResequencing}
+                onDragStart={() => {
+                  setDraggingItemId(item.item_id);
+                }}
+                onDragEnd={() => {
+                  setDraggingItemId(null);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
 
-                if (draggingItemId !== null) {
-                  void moveItem(draggingItemId, item.item_id);
-                }
+                  if (draggingItemId !== null) {
+                    void moveItem(draggingItemId, item.item_id);
+                  }
 
-                setDraggingItemId(null);
-              }}
-              className={`cursor-move border-b border-border/60 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-muted/40" : "bg-card"} ${draggingItemId === item.item_id ? "opacity-60" : "opacity-100"}`}
-            >
-              <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_190px] md:items-center md:gap-4">
+                  setDraggingItemId(null);
+                }}
+                className={`cursor-move px-4 py-4 ${item.purchased ? "bg-muted/40" : "bg-card"} ${draggingItemId === item.item_id ? "opacity-60" : "opacity-100"}`}
+              >
+                <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_190px] md:items-center md:gap-4">
                 {item.item_image && !brokenImageItemIds.includes(item.item_id) ? (
                   <Image
                     src={`data:image/*;base64,${item.item_image}`}
@@ -443,49 +444,59 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                   )}
                 </div>
 
-                <div className="text-lg font-semibold text-foreground">${item.price.toFixed(2)}</div>
-                <div className="text-sm font-medium text-muted-foreground">{item.quantity}</div>
+                  <div className="flex items-center gap-2 rounded-md border border-border/70 bg-muted/30 px-2 py-1.5 md:contents md:rounded-none md:border-0 md:bg-transparent md:p-0">
+                    <div className="text-sm font-semibold text-foreground md:text-lg">
+                      ${item.price.toFixed(2)}
+                    </div>
+                    <div className="text-xs font-medium text-muted-foreground md:text-sm">
+                      Qty {item.quantity}
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    className="h-8 w-auto px-3"
-                    disabled={isResequencing}
-                    onClick={() => {
-                      setError(null);
-                      setEditingItemId(item.item_id);
-                      setEditingItem(item);
-                      setForm({
-                        title: item.title,
-                        description: item.description ?? "",
-                        url: item.url ?? "",
-                        price: String(item.price),
-                        quantity: String(item.quantity),
-                        priority: String(item.priority) as "0" | "1" | "2",
-                      });
-                      setItemImageBase64(item.item_image);
-                      setIsAddDialogOpen(true);
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="icon-sm"
-                    className="h-8 w-auto px-3"
-                    disabled={isPending || isResequencing}
-                    title="Delete item"
-                    onClick={() => setDeleteConfirmItem(item)}
-                  >
-                    Delete
-                  </Button>
+                    <div className="ml-auto flex items-center gap-1.5 md:ml-0 md:gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        className="h-8 w-8 p-0"
+                        disabled={isResequencing}
+                        title="Edit item"
+                        aria-label="Edit item"
+                        onClick={() => {
+                          setError(null);
+                          setEditingItemId(item.item_id);
+                          setEditingItem(item);
+                          setForm({
+                            title: item.title,
+                            description: item.description ?? "",
+                            url: item.url ?? "",
+                            price: String(item.price),
+                            quantity: String(item.quantity),
+                            priority: String(item.priority) as "0" | "1" | "2",
+                          });
+                          setItemImageBase64(item.item_image);
+                          setIsAddDialogOpen(true);
+                        }}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon-sm"
+                        className="h-8 w-8 p-0"
+                        disabled={isPending || isResequencing}
+                        title="Delete item"
+                        aria-label="Delete item"
+                        onClick={() => setDeleteConfirmItem(item)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
