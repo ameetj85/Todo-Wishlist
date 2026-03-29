@@ -3,14 +3,31 @@ import sharp from "sharp";
 
 type ExtractImageBody = {
   url?: string;
+  title?: string;
 };
 
-function getFirstImageSource(html: string) {
+function getFirstImageSource(html: string, title?: string) {
+  if (title) {
+    // Find img tag where alt attribute contains a part of the title
+    const titleLower = title.toLowerCase();
+    const altMatches = html.matchAll(/<img[^>]+alt=["']([^"']*)["'][^>]+src=["']([^"']+)["']|<img[^>]+src=["']([^"']+)["'][^>]+alt=["']([^"']*)["']/gi);
+    
+    for (const match of altMatches) {
+      const altText = (match[1] || match[4] || "").toLowerCase();
+      const src = match[2] || match[3];
+      
+      if (altText.includes(titleLower)) {
+        return src;
+      }
+    }
+  }
+  
+  // Fallback to first image if no title match or no title provided
   const imageTagMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
   return imageTagMatch?.[1] ?? null;
 }
 
-const MAX_IMAGE_BYTES = 200 * 1024;
+const MAX_IMAGE_BYTES = 700 * 1024;
 
 async function optimizeImageBuffer(inputBuffer: Buffer) {
   let width = 800;
@@ -38,7 +55,7 @@ async function optimizeImageBuffer(inputBuffer: Buffer) {
   return outputBuffer;
 }
 
-async function tryExtractFirstImageAsBase64(rawUrl: string) {
+async function tryExtractFirstImageAsBase64(rawUrl: string, title?: string) {
   try {
     const normalizedPageUrl = /^https?:\/\//i.test(rawUrl)
       ? rawUrl
@@ -56,7 +73,7 @@ async function tryExtractFirstImageAsBase64(rawUrl: string) {
     }
 
     const html = await pageResponse.text();
-    const firstImageSource = getFirstImageSource(html);
+    const firstImageSource = getFirstImageSource(html, title);
 
     if (!firstImageSource) {
       return null;
@@ -98,12 +115,13 @@ export async function POST(request: Request) {
   }
 
   const url = String(body.url ?? "").trim();
+  const title = String(body.title ?? "").trim();
 
   if (!url) {
     return NextResponse.json({ error: "url is required" }, { status: 400 });
   }
 
-  const imageBase64 = await tryExtractFirstImageAsBase64(url);
+  const imageBase64 = await tryExtractFirstImageAsBase64(url, title);
 
   return NextResponse.json({ imageBase64 });
 }

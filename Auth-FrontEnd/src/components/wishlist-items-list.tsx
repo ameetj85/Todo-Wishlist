@@ -172,6 +172,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
   async function extractImageFromUrl() {
     const url = form.url.trim();
+    const title = form.title.trim();
 
     if (!url) {
       setError("Enter a URL first before extracting an image");
@@ -181,7 +182,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
     setError(null);
     setIsExtractingImage(true);
 
-    const payload = await extractWishlistImageAction(url);
+    const payload = await extractWishlistImageAction(url, title);
 
     if (payload.imageBase64) {
       setItemImageBase64(payload.imageBase64);

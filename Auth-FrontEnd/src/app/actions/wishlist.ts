@@ -1,6 +1,7 @@
 "use server";
 
 import { getAuthToken } from "@/lib/auth-cookie";
+import sharp from "sharp";
 
 type WishlistPayload = {
   title: string;
@@ -113,7 +114,7 @@ export async function deleteWishlistItemAction(itemId: number) {
   }
 }
 
-export async function extractWishlistImageAction(url: string) {
+export async function extractWishlistImageAction(url: string, title?: string) {
   try {
     const normalizedUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
 
@@ -129,8 +130,30 @@ export async function extractWishlistImageAction(url: string) {
     }
 
     const html = await pageResponse.text();
-    const imageTagMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-    const firstImageSource = imageTagMatch?.[1] ?? null;
+    
+    // Find img tag where alt attribute contains a part of the title
+    let firstImageSource: string | null = null;
+    
+    if (title) {
+      const titleLower = title.toLowerCase();
+      const altMatches = html.matchAll(/<img[^>]+alt=["']([^"']*)["'][^>]+src=["']([^"']+)["']|<img[^>]+src=["']([^"']+)["'][^>]+alt=["']([^"']*)["']/gi);
+      
+      for (const match of altMatches) {
+        const altText = (match[1] || match[4] || "").toLowerCase();
+        const src = match[2] || match[3];
+        
+        if (altText.includes(titleLower)) {
+          firstImageSource = src;
+          break;
+        }
+      }
+    }
+    
+    // Fallback to first image if no title match or no title provided
+    if (!firstImageSource) {
+      const imageTagMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      firstImageSource = imageTagMatch?.[1] ?? null;
+    }
 
     if (!firstImageSource) {
       return { ok: true as const, imageBase64: null };
@@ -154,10 +177,39 @@ export async function extractWishlistImageAction(url: string) {
     }
 
     const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    return { ok: true as const, imageBase64: imageBuffer.toString("base64") };
+    const optimizedBuffer = await optimizeImageBuffer(imageBuffer);
+    return { ok: true as const, imageBase64: optimizedBuffer.toString("base64") };
   } catch {
     return { ok: true as const, imageBase64: null };
   }
+}
+
+const MAX_IMAGE_BYTES = 700 * 1024;
+
+async function optimizeImageBuffer(inputBuffer: Buffer) {
+  let width = 800;
+  let quality = 82;
+  let attempts = 0;
+  let outputBuffer = inputBuffer;
+
+  // Iteratively reduce dimensions/quality until the payload is small enough.
+  while (attempts < 6) {
+    outputBuffer = await sharp(inputBuffer)
+      .rotate()
+      .resize({ width, withoutEnlargement: true })
+      .jpeg({ quality, mozjpeg: true })
+      .toBuffer();
+
+    if (outputBuffer.byteLength <= MAX_IMAGE_BYTES) {
+      return outputBuffer;
+    }
+
+    width = Math.max(240, Math.floor(width * 0.8));
+    quality = Math.max(45, quality - 8);
+    attempts += 1;
+  }
+
+  return outputBuffer;
 }
 
 export async function togglePublicWishlistPurchasedAction(payload: {
