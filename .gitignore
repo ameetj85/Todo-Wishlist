@@ -30,8 +30,9 @@
 /Auth-REST-API/.env
 !/Auth-REST-API/.env.example
 /Auth-REST-API/mnt/user-data/outputs/
+/Auth-REST-API/data/auth.db
 /Auth-REST-API/data/auth.db-shm
-/Auth-REST-API/data/auth.db-was
+/Auth-REST-API/data/auth.db-wal
 
 # =========================
 # Common logs / OS files
