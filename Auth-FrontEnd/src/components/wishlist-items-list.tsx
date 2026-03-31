@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ExternalLink, Package, Pencil, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -60,6 +60,9 @@ function getPriorityChipClasses(priority: number) {
 }
 
 export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
+  const IMAGE_BATCH_SIZE = 2;
+  const IMAGE_BATCH_DELAY_MS = 180;
+
   const manualImageInputRef = useRef<HTMLInputElement | null>(null);
   const [items, setItems] = useState(initialItems);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +78,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
   const [itemImageBase64, setItemImageBase64] = useState<string | null>(null);
   const [isExtractingImage, setIsExtractingImage] = useState(false);
   const [urlImageUnavailable, setUrlImageUnavailable] = useState(false);
+  const [visibleImageItemIds, setVisibleImageItemIds] = useState<number[]>([]);
   const [form, setForm] = useState<NewItemForm>({
     title: "",
     description: "",
@@ -89,6 +93,58 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
     () => [...items].sort((a, b) => a.sequence - b.sequence || b.item_id - a.item_id),
     [items],
   );
+
+  const visibleImageIdSet = useMemo(
+    () => new Set(visibleImageItemIds),
+    [visibleImageItemIds],
+  );
+
+  useEffect(() => {
+    const imageItemIds = sortedItems
+      .filter((item) => item.item_image)
+      .map((item) => item.item_id);
+
+    if (imageItemIds.length === 0) {
+      setVisibleImageItemIds([]);
+      return;
+    }
+
+    setVisibleImageItemIds([]);
+
+    let cancelled = false;
+    let timerId: number | null = null;
+    let firstRaf = 0;
+    let secondRaf = 0;
+    let loadedCount = 0;
+
+    const revealNextBatch = () => {
+      if (cancelled) {
+        return;
+      }
+
+      loadedCount = Math.min(loadedCount + IMAGE_BATCH_SIZE, imageItemIds.length);
+      setVisibleImageItemIds(imageItemIds.slice(0, loadedCount));
+
+      if (loadedCount < imageItemIds.length) {
+        timerId = window.setTimeout(revealNextBatch, IMAGE_BATCH_DELAY_MS);
+      }
+    };
+
+    firstRaf = window.requestAnimationFrame(() => {
+      secondRaf = window.requestAnimationFrame(() => {
+        revealNextBatch();
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(firstRaf);
+      window.cancelAnimationFrame(secondRaf);
+      if (timerId !== null) {
+        window.clearTimeout(timerId);
+      }
+    };
+  }, [sortedItems]);
 
   async function persistNewSequence(
     nextItems: WishlistItem[],
@@ -389,7 +445,9 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                 className={`cursor-move px-4 py-4 ${item.purchased ? "bg-muted/40" : "bg-card"} ${draggingItemId === item.item_id ? "opacity-60" : "opacity-100"}`}
               >
                 <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_190px] md:items-center md:gap-4">
-                {item.item_image && !brokenImageItemIds.includes(item.item_id) ? (
+                {item.item_image &&
+                visibleImageIdSet.has(item.item_id) &&
+                !brokenImageItemIds.includes(item.item_id) ? (
                   <Image
                     src={`data:image/*;base64,${item.item_image}`}
                     alt={item.title}
