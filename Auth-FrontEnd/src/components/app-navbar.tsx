@@ -66,7 +66,15 @@ export function AppNavbar({
 
   useEffect(() => {
     function updateViewportMode() {
-      setIsDesktopNav(window.innerWidth >= DESKTOP_NAV_MIN_WIDTH);
+      const widths = [
+        window.innerWidth,
+        window.outerWidth,
+        window.screen.width,
+        window.visualViewport?.width ?? 0,
+      ];
+      const effectiveWidth = Math.max(...widths);
+
+      setIsDesktopNav(effectiveWidth >= DESKTOP_NAV_MIN_WIDTH);
     }
 
     updateViewportMode();
