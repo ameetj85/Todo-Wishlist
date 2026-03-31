@@ -44,13 +44,6 @@ export function AppNavbar({
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isDesktopNav, setIsDesktopNav] = useState(false);
-  const [viewportDebug, setViewportDebug] = useState({
-    effectiveWidth: 0,
-    innerWidth: 0,
-    outerWidth: 0,
-    screenWidth: 0,
-    visualViewportWidth: 0,
-  });
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const mobileNavRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,14 +72,6 @@ export function AppNavbar({
       const visualViewportWidth = window.visualViewport?.width ?? 0;
       const widths = [innerWidth, outerWidth, screenWidth, visualViewportWidth];
       const effectiveWidth = Math.max(...widths);
-
-      setViewportDebug({
-        effectiveWidth,
-        innerWidth,
-        outerWidth,
-        screenWidth,
-        visualViewportWidth,
-      });
 
       setIsDesktopNav(effectiveWidth >= DESKTOP_NAV_MIN_WIDTH);
     }
@@ -192,10 +177,7 @@ export function AppNavbar({
 
   return (
     <>
-      <nav className="relative border-b">
-        <div className="pointer-events-none absolute top-1 right-2 z-10 rounded-md border border-border bg-background/90 px-2 py-1 text-[10px] leading-tight text-muted-foreground shadow-sm">
-          {isDesktopNav ? "desktop" : "mobile"} | eff:{viewportDebug.effectiveWidth} | i:{viewportDebug.innerWidth} o:{viewportDebug.outerWidth} s:{viewportDebug.screenWidth} v:{Math.round(viewportDebug.visualViewportWidth)}
-        </div>
+      <nav className="border-b">
         <div className="mx-auto flex w-full max-w-6xl flex-nowrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center justify-self-start gap-2">
             {!isDesktopNav ? (
