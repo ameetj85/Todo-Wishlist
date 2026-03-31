@@ -149,9 +149,9 @@ export function AppNavbar({
   return (
     <>
       <nav className="border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:px-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center md:gap-2 md:px-6 md:py-4">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center justify-self-start gap-2">
-            <div className="relative md:hidden" ref={mobileNavRef}>
+            <div className="relative sm:hidden" ref={mobileNavRef}>
               <button
                 type="button"
                 aria-haspopup="menu"
@@ -231,7 +231,7 @@ export function AppNavbar({
               priority
             />
             <div className="flex min-w-0 items-baseline gap-2">
-              <span className="hidden max-w-[14rem] truncate text-lg font-bold sm:inline md:max-w-none md:text-2xl">
+              <span className="hidden max-w-[14rem] truncate text-lg font-bold sm:inline sm:max-w-none sm:text-2xl">
                 Your Smashing Apps
               </span>
               {isAuthenticated && userName ? (
@@ -242,7 +242,7 @@ export function AppNavbar({
             </div>
           </div>
 
-          <div className="hidden w-full flex-wrap items-center justify-start gap-2 md:flex md:w-auto md:justify-center">
+          <div className="hidden w-full flex-wrap items-center justify-start gap-2 sm:flex sm:w-auto sm:justify-center">
             {!isAuthenticated ? (
               <Link
                 href="#"
@@ -281,7 +281,7 @@ export function AppNavbar({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center justify-end justify-self-end gap-2 md:w-auto">
+          <div className="flex shrink-0 items-center justify-end justify-self-end gap-2 sm:w-auto">
             {showDueTodayBell ? (
               <Link
                 href="/todo?filter=due-today-open"
