@@ -30,6 +30,8 @@ export function AppNavbar({
   userName,
   dueTodayOpenTodoCount = 0,
 }: AppNavbarProps) {
+  const DESKTOP_NAV_MIN_WIDTH = 1024;
+
   const emailInputId = useId();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -41,6 +43,7 @@ export function AppNavbar({
   const [isLookingUpWishlist, setIsLookingUpWishlist] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isDesktopNav, setIsDesktopNav] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const mobileNavRef = useRef<HTMLDivElement | null>(null);
 
@@ -60,6 +63,25 @@ export function AppNavbar({
   const showDueTodayBell =
     isAuthenticated && (dueTodayOpenTodoCount > 0 || isDueTodayOpenFilterActive);
   const bellCountLabel = dueTodayOpenTodoCount > 99 ? "99+" : `${dueTodayOpenTodoCount}`;
+
+  useEffect(() => {
+    function updateViewportMode() {
+      setIsDesktopNav(window.innerWidth >= DESKTOP_NAV_MIN_WIDTH);
+    }
+
+    updateViewportMode();
+    window.addEventListener("resize", updateViewportMode);
+
+    return () => {
+      window.removeEventListener("resize", updateViewportMode);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isDesktopNav) {
+      setIsMobileNavOpen(false);
+    }
+  }, [isDesktopNav]);
 
   useEffect(() => {
     function onWindowClick(event: MouseEvent) {
@@ -149,9 +171,10 @@ export function AppNavbar({
   return (
     <>
       <nav className="border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-2 px-3 py-3 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-2 sm:px-6 sm:py-4">
+        <div className="mx-auto flex w-full max-w-6xl flex-nowrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
           <div className="flex min-w-0 items-center justify-self-start gap-2">
-            <div className="relative sm:hidden" ref={mobileNavRef}>
+            {!isDesktopNav ? (
+              <div className="relative" ref={mobileNavRef}>
               <button
                 type="button"
                 aria-haspopup="menu"
@@ -220,7 +243,8 @@ export function AppNavbar({
                   ) : null}
                 </div>
               ) : null}
-            </div>
+              </div>
+            ) : null}
 
             <Image
               src="/appLogo.png"
@@ -242,7 +266,10 @@ export function AppNavbar({
             </div>
           </div>
 
-          <div className="hidden w-full flex-wrap items-center justify-start gap-2 sm:flex sm:w-auto sm:justify-center">
+          <div className={cn(
+            "hidden w-full flex-wrap items-center justify-start gap-2",
+            isDesktopNav && "flex w-auto justify-center",
+          )}>
             {!isAuthenticated ? (
               <Link
                 href="#"
@@ -281,7 +308,7 @@ export function AppNavbar({
             ) : null}
           </div>
 
-          <div className="flex shrink-0 items-center justify-end justify-self-end gap-2 sm:w-auto">
+          <div className="flex shrink-0 items-center justify-end justify-self-end gap-2">
             {showDueTodayBell ? (
               <Link
                 href="/todo?filter=due-today-open"
