@@ -30,7 +30,7 @@ export function AppNavbar({
   userName,
   dueTodayOpenTodoCount = 0,
 }: AppNavbarProps) {
-  const DESKTOP_NAV_MIN_WIDTH = 1024;
+  const DESKTOP_NAV_MIN_WIDTH = 768;
 
   const emailInputId = useId();
   const pathname = usePathname();
