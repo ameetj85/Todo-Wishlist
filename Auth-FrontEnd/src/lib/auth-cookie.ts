@@ -89,12 +89,9 @@ export async function clearAuthToken() {
   const cookieStore = await cookies();
   const cookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim() || undefined;
 
-  cookieStore.set(AUTH_COOKIE_NAME, "", {
-    httpOnly: true,
-    secure: await resolveSecureCookieFlag(),
-    sameSite: "lax",
+  cookieStore.delete({
+    name: AUTH_COOKIE_NAME,
     path: "/",
     domain: cookieDomain,
-    maxAge: 0,
   });
 }

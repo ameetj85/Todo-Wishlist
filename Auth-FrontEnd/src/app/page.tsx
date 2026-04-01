@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { HeroWishlistLookup } from "@/components/hero-wishlist-lookup";
 import {
   Card,
   CardContent,
@@ -59,7 +60,8 @@ export default async function Home() {
           </Card>
         </div>
       ) : (
-        <Card className="w-full max-w-2xl border-blue-200/70 shadow-sm">
+        <div className="w-full space-y-6">
+          <Card className="w-full max-w-2xl self-center border-blue-200/70 shadow-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">
               Unlock Todo List + Wishlist
@@ -85,6 +87,9 @@ export default async function Home() {
             </div>
           </CardContent>
         </Card>
+
+          <HeroWishlistLookup />
+        </div>
       )}
     </main>
   );

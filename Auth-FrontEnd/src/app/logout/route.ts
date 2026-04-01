@@ -2,7 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 
 import { logout } from "@/lib/auth-api";
-import { clearAuthToken, getAuthToken } from "@/lib/auth-cookie";
+import { AUTH_COOKIE_NAME, clearAuthToken, getAuthToken } from "@/lib/auth-cookie";
 
 export async function GET(request: Request) {
   const token = await getAuthToken();
@@ -16,5 +16,14 @@ export async function GET(request: Request) {
   revalidatePath("/about");
 
   const redirectUrl = new URL("/", request.url);
-  return NextResponse.redirect(redirectUrl);
+  const response = NextResponse.redirect(redirectUrl);
+  // Belt-and-suspenders: also clear the cookie directly on the redirect response,
+  // because cookies() mutations may not always propagate into NextResponse.redirect().
+  response.cookies.set(AUTH_COOKIE_NAME, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+  });
+  return response;
 }

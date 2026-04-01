@@ -178,7 +178,7 @@ export function AppNavbar({
   return (
     <>
       <nav className="border-b">
-        <div className="mx-auto flex w-full max-w-6xl flex-nowrap items-center justify-between gap-2 px-3 py-3 sm:px-6 sm:py-4">
+        <div className="flex w-full flex-nowrap items-center justify-between gap-2 px-3 py-3 sm:px-4 sm:py-4">
           <div className="flex min-w-0 items-center justify-self-start gap-2">
             {!isDesktopNav ? (
               <div className="relative" ref={mobileNavRef}>
@@ -387,13 +387,12 @@ export function AppNavbar({
                   ) : null}
 
                   {isAuthenticated ? (
-                    <Link
+                    <a
                       href="/logout"
                       className="block rounded-md px-3 py-2 text-sm text-foreground hover:bg-accent"
-                      onClick={() => setIsProfileMenuOpen(false)}
                     >
                       Sign Out
-                    </Link>
+                    </a>
                   ) : !onLoginPage ? (
                     <Link
                       href={pathname === "/" ? "/login?from=hero" : "/login"}
