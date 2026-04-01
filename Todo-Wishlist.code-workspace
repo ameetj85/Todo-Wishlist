@@ -28,5 +28,8 @@
       "titleBar.inactiveForeground": "#e7e7e799",
     },
     "peacock.color": "#007fff",
+    "chat.tools.terminal.autoApprove": {
+      "npx prisma@7.6.0": true
+    },
   },
 }

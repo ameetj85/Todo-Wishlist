@@ -1,12 +1,10 @@
-'use strict';
+import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { defineConfig } from 'prisma/config';
 
-const fs = require('fs');
-const path = require('path');
-const { PrismaClient } = require('@prisma/client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
-
-function normalizeSqliteFileUrl(rawUrl) {
-  if (!rawUrl || !rawUrl.startsWith('file:')) {
+function normalizeSqliteFileUrl(rawUrl: string): string {
+  if (!rawUrl.startsWith('file:')) {
     return rawUrl;
   }
 
@@ -32,8 +30,8 @@ function normalizeSqliteFileUrl(rawUrl) {
   return `file:${absoluteDbPath}${queryPart}`;
 }
 
-function sqliteFilePathFromUrl(url) {
-  if (!url || !url.startsWith('file:')) {
+function sqliteFilePathFromUrl(url: string): string | null {
+  if (!url.startsWith('file:')) {
     return null;
   }
 
@@ -46,7 +44,7 @@ function sqliteFilePathFromUrl(url) {
   return queryIndex === -1 ? sqlitePath : sqlitePath.slice(0, queryIndex);
 }
 
-function isExistingNonEmptyFile(filePath) {
+function isExistingNonEmptyFile(filePath: string): boolean {
   try {
     const stat = fs.statSync(filePath);
     return stat.isFile() && stat.size > 0;
@@ -55,7 +53,7 @@ function isExistingNonEmptyFile(filePath) {
   }
 }
 
-function resolveDatabaseUrl() {
+function resolveDatabaseUrl(): string {
   const fallbackDbPath = process.env.DB_PATH || './data/auth.db';
   const fallbackUrl = normalizeSqliteFileUrl(
     fallbackDbPath.startsWith('file:') ? fallbackDbPath : `file:${fallbackDbPath}`,
@@ -80,37 +78,18 @@ function resolveDatabaseUrl() {
 
   const dbPath = fallbackDbPath;
 
-  // SQLite in-memory mode is not stable across pooled connections; use a temp file for tests.
   if (dbPath === ':memory:') {
     return 'file:./data/test.db';
   }
 
-  return normalizeSqliteFileUrl(dbPath.startsWith('file:') ? dbPath : `file:${dbPath}`);
+  return normalizeSqliteFileUrl(
+    dbPath.startsWith('file:') ? dbPath : `file:${dbPath}`,
+  );
 }
 
-function getDatabaseUrl() {
-  const url = resolveDatabaseUrl();
-  process.env.DATABASE_URL = url;
-  return url;
-}
-
-getDatabaseUrl();
-
-const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL,
+export default defineConfig({
+  schema: 'prisma/schema.prisma',
+  datasource: {
+    url: resolveDatabaseUrl(),
+  },
 });
-
-const globalForPrisma = globalThis;
-
-const prisma =
-  globalForPrisma.__prisma ||
-  new PrismaClient({
-    adapter,
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-  });
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.__prisma = prisma;
-}
-
-module.exports = { prisma, getDatabaseUrl };

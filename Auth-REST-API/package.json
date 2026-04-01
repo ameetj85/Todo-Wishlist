@@ -4,14 +4,14 @@
   "description": "Production-ready REST API authentication system with SQLite",
   "main": "server.js",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.19.0"
   },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "DATABASE_URL=file:./data/test.db prisma db push --skip-generate && node --test --test-concurrency=1 src/tests/**/*.test.js",
-    "test:watch": "DATABASE_URL=file:./data/test.db prisma db push --skip-generate && node --test --test-concurrency=1 --watch src/tests/**/*.test.js",
-    "test:coverage": "DATABASE_URL=file:./data/test.db prisma db push --skip-generate && node --experimental-test-coverage --test --test-concurrency=1 src/tests/**/*.test.js",
+    "test": "DATABASE_URL=file:./data/test.db prisma db push && node --test --test-concurrency=1 src/tests/**/*.test.js",
+    "test:watch": "DATABASE_URL=file:./data/test.db prisma db push && node --test --test-concurrency=1 --watch src/tests/**/*.test.js",
+    "test:coverage": "DATABASE_URL=file:./data/test.db prisma db push && node --experimental-test-coverage --test --test-concurrency=1 src/tests/**/*.test.js",
     "lint": "eslint . --ext .js",
     "lint:fix": "eslint . --ext .js --fix",
     "db:init": "prisma db push",
@@ -32,17 +32,19 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@prisma/client": "^6.5.0",
+    "@prisma/adapter-better-sqlite3": "^7.6.0",
+    "@prisma/client": "^7.6.0",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.8.0",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "express-rate-limit": "^8.3.0",
+    "express-rate-limit": "^8.3.2",
     "helmet": "^8.1.0",
-    "nodemailer": "^8.0.1",
+    "nodemailer": "^8.0.4",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
-    "eslint": "^10.0.3",
-    "prisma": "^6.5.0"
+    "eslint": "^10.1.0",
+    "prisma": "^7.6.0"
   }
 }
