@@ -55,6 +55,10 @@ const config = {
   bcrypt: {
     saltRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
   },
+
+  registration: {
+    open: process.env.REGISTRATION_OPEN !== 'false',
+  },
 };
 
 module.exports = config;

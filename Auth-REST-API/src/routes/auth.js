@@ -39,6 +39,13 @@ async function createSession(userId, req) {
 }
 
 router.post('/signup', async (req, res) => {
+  if (!config.registration.open) {
+    return res.status(403).json({
+      error: 'Registration is currently closed. This service is invite-only.',
+      code: 'REGISTRATION_CLOSED',
+    });
+  }
+
   const { email, password, name } = req.body;
 
   const err = validateSignup({ email, password, name });
