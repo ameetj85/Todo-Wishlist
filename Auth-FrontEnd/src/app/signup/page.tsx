@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LockKeyhole, MailCheck, UserX } from "lucide-react";
+import { CloudCog, LockKeyhole, MailCheck, UserX } from "lucide-react";
 
 import { SignupForm } from "@/components/auth/signup-form";
 import {
@@ -12,7 +12,9 @@ import {
 
 const registrationOpen = process.env.REGISTRATION_OPEN !== "false";
 
+
 export default function SignupPage() {
+  console.log("Registration open:", registrationOpen);
   if (!registrationOpen) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-lg flex-col items-center justify-center gap-6 px-6 py-12">
