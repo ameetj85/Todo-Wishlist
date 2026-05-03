@@ -67,6 +67,20 @@ async function parseJson<T>(response: Response): Promise<T | null> {
   return JSON.parse(body) as T;
 }
 
+function buildResponseError(url: string, response: Response, payloadError?: string) {
+  if (payloadError) {
+    return payloadError;
+  }
+
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? "";
+
+  if (contentType.includes("text/html")) {
+    return `Authentication API returned HTML (${response.status}) from ${url}. Check AUTH_API_BASE_URL.`;
+  }
+
+  return `Authentication API returned ${response.status} from ${url}`;
+}
+
 async function request<TResponse>(
   path: string,
   init?: RequestInit,
@@ -80,11 +94,12 @@ async function request<TResponse>(
   }
 
   let response: Response;
+  const url = buildAuthUrl(path);
 
-  console.log("Requesting:", buildAuthUrl(path), init, token);
+  console.log("Requesting:", url, init, token);
 
   try {
-    response = await fetch(buildAuthUrl(path), {
+    response = await fetch(url, {
       ...init,
       headers,
       cache: "no-store",
@@ -109,7 +124,7 @@ async function request<TResponse>(
     return {
       ok: false,
       status: response.status,
-      error: json?.error ?? "Request failed",
+      error: buildResponseError(url, response, json?.error),
       code: json?.code,
     };
   }

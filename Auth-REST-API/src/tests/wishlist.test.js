@@ -190,6 +190,42 @@ describe('Wishlist CRUD Routes', () => {
     assert.ok(res.body.item.created_date);
   });
 
+  it('adds new wishlist items to the top of the display order', async () => {
+    const token = await signupAndGetToken();
+
+    const first = await request(
+      app,
+      'POST',
+      '/api/wishlist',
+      { title: 'First Item' },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    const second = await request(
+      app,
+      'POST',
+      '/api/wishlist',
+      { title: 'Second Item' },
+      { Authorization: `Bearer ${token}` },
+    );
+
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.equal(first.body.item.sequence, 0);
+    assert.equal(second.body.item.sequence, 0);
+
+    const list = await request(app, 'GET', '/api/wishlist', null, {
+      Authorization: `Bearer ${token}`,
+    });
+
+    assert.equal(list.status, 200);
+    assert.equal(list.body.items.length, 2);
+    assert.equal(list.body.items[0].title, 'Second Item');
+    assert.equal(list.body.items[0].sequence, 0);
+    assert.equal(list.body.items[1].title, 'First Item');
+    assert.equal(list.body.items[1].sequence, 1);
+  });
+
   it('lists only current user wishlist items', async () => {
     const token1 = await signupAndGetToken('w1@example.com');
     const token2 = await signupAndGetToken('w2@example.com');

@@ -69,17 +69,21 @@ function toWishlistResponse(row) {
   };
 }
 
-async function resolveSequenceForCreate(userId, requestedSequence) {
-  if (requestedSequence !== undefined && requestedSequence !== 0) {
+async function resolveSequenceForCreate(transaction, userId, requestedSequence) {
+  if (requestedSequence !== undefined) {
     return requestedSequence;
   }
 
-  const maxResult = await prisma.wishlistItem.aggregate({
+  await transaction.wishlistItem.updateMany({
     where: { userId },
-    _max: { sequence: true },
+    data: {
+      sequence: {
+        increment: 1,
+      },
+    },
   });
 
-  return (maxResult._max.sequence ?? 0) + 1;
+  return 0;
 }
 
 router.get('/public/by-email', async (req, res) => {
@@ -209,22 +213,27 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: parsedPrice.error });
   }
 
-  const finalSequence = await resolveSequenceForCreate(req.user.id, sequence);
+  const item = await prisma.$transaction(async (transaction) => {
+    const finalSequence =
+      sequence !== undefined
+        ? sequence
+        : await resolveSequenceForCreate(transaction, req.user.id, sequence);
 
-  const item = await prisma.wishlistItem.create({
-    data: {
-      userId: req.user.id,
-      title: title.trim(),
-      description: description ?? null,
-      url: url ?? null,
-      itemImage: image.blob ?? null,
-      price: parsedPrice.value,
-      priority: priority ?? 1,
-      quantity: quantity ?? 1,
-      purchased: !!purchased,
-      sequence: finalSequence,
-      createdDate: toSqliteDateOnly(Date.now()),
-    },
+    return transaction.wishlistItem.create({
+      data: {
+        userId: req.user.id,
+        title: title.trim(),
+        description: description ?? null,
+        url: url ?? null,
+        itemImage: image.blob ?? null,
+        price: parsedPrice.value,
+        priority: priority ?? 1,
+        quantity: quantity ?? 1,
+        purchased: !!purchased,
+        sequence: finalSequence,
+        createdDate: toSqliteDateOnly(Date.now()),
+      },
+    });
   });
 
   return res.status(201).json({ item: toWishlistResponse(item) });
