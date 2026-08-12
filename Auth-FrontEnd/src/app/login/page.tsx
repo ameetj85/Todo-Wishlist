@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <LoginForm nextPath={params.next} fromHero={fromHero} />
+          <LoginForm nextPath={params.next} />
           <p className="text-sm text-muted-foreground">
             Forgot password?{" "}
             <Link

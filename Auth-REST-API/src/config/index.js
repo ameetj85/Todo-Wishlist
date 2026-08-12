@@ -57,7 +57,7 @@ const config = {
   },
 
   registration: {
-    open: process.env.REGISTRATION_OPEN !== 'false',
+    open: process.env.REGISTRATION_OPEN === 'true',
   },
 };
 

@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-const registrationOpen = process.env.REGISTRATION_OPEN !== "false";
+const registrationOpen = process.env.REGISTRATION_OPEN === "true";
 
 
 export default function SignupPage() {

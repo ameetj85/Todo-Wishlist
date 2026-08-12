@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
 
@@ -15,12 +14,10 @@ const initialState: ActionState = {};
 
 type LoginFormProps = {
   nextPath?: string;
-  fromHero?: boolean;
 };
 
 export function LoginForm({
   nextPath = "/",
-  fromHero = false,
 }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, initialState);
   const [isUnverifiedModalOpen, setIsUnverifiedModalOpen] = useState(false);
@@ -68,13 +65,7 @@ export function LoginForm({
       </SubmitButton>
 
       <p className="text-sm text-muted-foreground">
-        Don&apos;t have an account?{" "}
-        <Link
-          href={fromHero ? "/signup?from=hero" : "/signup"}
-          className="text-foreground underline underline-offset-4"
-        >
-          Sign up
-        </Link>
+        Registration is currently closed. Accounts are available by invitation only.
       </p>
 
       {isUnverifiedModalOpen ? (

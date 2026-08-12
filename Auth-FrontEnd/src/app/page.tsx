@@ -81,9 +81,13 @@ export default async function Home() {
               <Link href="/login?from=hero" className={ctaButtonClassName}>
                 Sign In
               </Link>
-              <Link href="/signup?from=hero" className={ctaButtonClassName}>
-                Sign Up
-              </Link>
+              <button
+                type="button"
+                disabled
+                className={`${ctaButtonClassName} cursor-not-allowed opacity-50`}
+              >
+                Sign Up Unavailable
+              </button>
             </div>
           </CardContent>
         </Card>
