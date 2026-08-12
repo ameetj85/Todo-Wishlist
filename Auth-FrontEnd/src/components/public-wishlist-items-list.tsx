@@ -22,6 +22,7 @@ type WishlistItem = {
 
 type WishlistFilter = "all" | "purchased" | "unpurchased";
 type PriorityFilter = "any" | "high" | "medium" | "low";
+type SortOption = "default" | "price-asc" | "price-desc" | "name";
 
 type PublicWishlistItemsListProps = {
   email: string;
@@ -55,23 +56,47 @@ function getPriorityChipClasses(priority: number) {
 export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsListProps) {
   const [filter, setFilter] = useState<WishlistFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("any");
+  const [sortOption, setSortOption] = useState<SortOption>("default");
 
-  const filteredItems = useMemo(() => {
-    return items.filter((item) => {
-      const matchesPurchaseFilter =
-        filter === "all" ||
-        (filter === "purchased" && item.purchased) ||
-        (filter === "unpurchased" && !item.purchased);
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const matchesPurchaseFilter =
+          filter === "all" ||
+          (filter === "purchased" && item.purchased) ||
+          (filter === "unpurchased" && !item.purchased);
 
-      const matchesPriorityFilter =
-        priorityFilter === "any" ||
-        (priorityFilter === "high" && item.priority === 0) ||
-        (priorityFilter === "medium" && item.priority === 1) ||
-        (priorityFilter === "low" && item.priority === 2);
+        const matchesPriorityFilter =
+          priorityFilter === "any" ||
+          (priorityFilter === "high" && item.priority === 0) ||
+          (priorityFilter === "medium" && item.priority === 1) ||
+          (priorityFilter === "low" && item.priority === 2);
 
-      return matchesPurchaseFilter && matchesPriorityFilter;
+        return matchesPurchaseFilter && matchesPriorityFilter;
+      }),
+    [filter, items, priorityFilter],
+  );
+
+  const sortedItems = useMemo(() => {
+    if (sortOption === "default") {
+      return filteredItems;
+    }
+
+    return [...filteredItems].sort((a, b) => {
+      if (sortOption === "price-asc") {
+        return a.price - b.price || a.item_id - b.item_id;
+      }
+
+      if (sortOption === "price-desc") {
+        return b.price - a.price || a.item_id - b.item_id;
+      }
+
+      return (
+        a.title.localeCompare(b.title, undefined, { sensitivity: "base" }) ||
+        a.item_id - b.item_id
+      );
     });
-  }, [filter, items, priorityFilter]);
+  }, [filteredItems, sortOption]);
 
   return (
     <div className="space-y-3">
@@ -122,9 +147,26 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
             <option value="low">Low</option>
           </select>
         </div>
+
+        <div className="flex items-center gap-2">
+          <label htmlFor="wishlist-sort" className="text-xs font-semibold text-muted-foreground">
+            Sort by
+          </label>
+          <select
+            id="wishlist-sort"
+            value={sortOption}
+            onChange={(event) => setSortOption(event.target.value as SortOption)}
+            className="h-8 rounded-md border border-input bg-background px-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+          >
+            <option value="default">Default</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="name">Name: A to Z</option>
+          </select>
+        </div>
       </div>
 
-      {filteredItems.length === 0 ? (
+      {sortedItems.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground shadow-sm">
           No items match this filter.
         </div>
@@ -138,7 +180,7 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
             <span>Action</span>
           </div>
 
-          {filteredItems.map((item) => (
+          {sortedItems.map((item) => (
             <div
               key={item.item_id}
               className={`border-b border-border/60 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-muted/40" : "bg-card"}`}
