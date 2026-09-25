@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useActionState } from "react";
+import Link from "next/link";
 
 import { loginAction, type ActionState } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,14 @@ const initialState: ActionState = {};
 
 type LoginFormProps = {
   nextPath?: string;
+  registrationOpen?: boolean;
+  signupHref?: string;
 };
 
 export function LoginForm({
   nextPath = "/",
+  registrationOpen = false,
+  signupHref = "/signup",
 }: LoginFormProps) {
   const [state, formAction] = useActionState(loginAction, initialState);
   const [isUnverifiedModalOpen, setIsUnverifiedModalOpen] = useState(false);
@@ -64,9 +69,18 @@ export function LoginForm({
         Login
       </SubmitButton>
 
-      <p className="text-sm text-muted-foreground">
-        Registration is currently closed. Accounts are available by invitation only.
-      </p>
+      {registrationOpen ? (
+        <p className="text-sm text-muted-foreground">
+          Don&apos;t have an account?{" "}
+          <Link href={signupHref} className="text-foreground underline underline-offset-4">
+            Sign up
+          </Link>
+        </p>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Registration is currently closed. Accounts are available by invitation only.
+        </p>
+      )}
 
       {isUnverifiedModalOpen ? (
         <div

@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isRegistrationOpen } from "@/lib/registration";
 import { getSessionData } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
@@ -80,13 +81,19 @@ export default async function Home() {
               <Link href="/login?from=hero" className={ctaButtonClassName}>
                 Sign In
               </Link>
-              <button
-                type="button"
-                disabled
-                className={`${ctaButtonClassName} cursor-not-allowed opacity-50`}
-              >
-                Sign Up Unavailable
-              </button>
+              {isRegistrationOpen() ? (
+                <Link href="/signup?from=hero" className={ctaButtonClassName}>
+                  Sign Up
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  disabled
+                  className={`${ctaButtonClassName} cursor-not-allowed opacity-50`}
+                >
+                  Sign Up Unavailable
+                </button>
+              )}
             </div>
           </CardContent>
         </Card>

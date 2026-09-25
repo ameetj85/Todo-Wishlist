@@ -8,6 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isRegistrationOpen } from "@/lib/registration";
+
+export const dynamic = "force-dynamic";
 
 type LoginPageProps = {
   searchParams: Promise<{ next?: string; from?: string }>;
@@ -25,7 +28,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <CardDescription>Sign in to your account</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <LoginForm nextPath={params.next} />
+          <LoginForm
+            nextPath={params.next}
+            registrationOpen={isRegistrationOpen()}
+            signupHref={fromHero ? "/signup?from=hero" : "/signup"}
+          />
           <p className="text-sm text-muted-foreground">
             Forgot password?{" "}
             <Link

@@ -9,13 +9,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isRegistrationOpen } from "@/lib/registration";
 
-const registrationOpen = process.env.REGISTRATION_OPEN === "true";
-
+export const dynamic = "force-dynamic";
 
 export default function SignupPage() {
-  console.log("Registration open:", registrationOpen);
-  if (!registrationOpen) {
+  if (!isRegistrationOpen()) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-lg flex-col items-center justify-center gap-6 px-6 py-12">
         {/* Icon cluster */}
