@@ -56,6 +56,10 @@ const config = {
     saltRounds: parseInt(process.env.BCRYPT_ROUNDS || '12', 10),
   },
 
+  shareLink: {
+    secret: process.env.JWT_SECRET || 'dev-share-link-secret',
+  },
+
   registration: {
     open: process.env.REGISTRATION_OPEN === 'true',
   },

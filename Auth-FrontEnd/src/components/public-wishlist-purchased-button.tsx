@@ -5,10 +5,16 @@ import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { togglePublicWishlistPurchasedAction } from "@/app/actions/wishlist";
+import {
+  togglePublicWishlistPurchasedAction,
+  toggleSharedWishlistPurchasedAction,
+} from "@/app/actions/wishlist";
+
+// Identifies whose wishlist is being viewed: by email lookup or by share link.
+export type PublicWishlistOwner = { email: string } | { shareToken: string };
 
 type PublicWishlistPurchasedButtonProps = {
-  email: string;
+  owner: PublicWishlistOwner;
   itemId: number;
   purchased: boolean;
   compact?: boolean;
@@ -16,7 +22,7 @@ type PublicWishlistPurchasedButtonProps = {
 };
 
 export function PublicWishlistPurchasedButton({
-  email,
+  owner,
   itemId,
   purchased,
   compact = false,
@@ -32,11 +38,18 @@ export function PublicWishlistPurchasedButton({
   async function togglePurchased() {
     setError(null);
 
-    const result = await togglePublicWishlistPurchasedAction({
-      email,
-      item_id: itemId,
-      purchased: nextPurchasedValue,
-    });
+    const result =
+      "shareToken" in owner
+        ? await toggleSharedWishlistPurchasedAction({
+            token: owner.shareToken,
+            item_id: itemId,
+            purchased: nextPurchasedValue,
+          })
+        : await togglePublicWishlistPurchasedAction({
+            email: owner.email,
+            item_id: itemId,
+            purchased: nextPurchasedValue,
+          });
 
     if (!result.ok) {
       setError(result.error ?? "Unable to mark item as purchased");
@@ -62,8 +75,8 @@ export function PublicWishlistPurchasedButton({
             : amazonStyle
               ? `h-8 w-auto rounded-full px-4 text-xs font-semibold ${
                   purchased
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-amber-300 text-slate-900 hover:bg-amber-400"
+                    ? "bg-green-600 text-white hover:bg-green-700"
+                    : "bg-yellow-400 text-black hover:bg-yellow-500"
                 }`
               : undefined
         }

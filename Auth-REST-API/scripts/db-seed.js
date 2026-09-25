@@ -168,11 +168,19 @@ async function seed() {
   for (const u of SEED_USERS) {
     const existing = await prisma.user.findUnique({
       where: { email: u.email },
-      select: { id: true },
+      select: { id: true, isAdmin: true },
     });
 
     if (existing) {
-      console.log(`   Skipped (already exists): ${u.email}`);
+      if (u.isAdmin && !existing.isAdmin) {
+        await prisma.user.update({
+          where: { id: existing.id },
+          data: { isAdmin: true },
+        });
+        console.log(`   Granted admin (already exists): ${u.email}`);
+      } else {
+        console.log(`   Skipped (already exists): ${u.email}`);
+      }
       continue;
     }
 
@@ -186,6 +194,7 @@ async function seed() {
         password: hash,
         name: u.name,
         isVerified: true,
+        isAdmin: !!u.isAdmin,
       },
     });
 

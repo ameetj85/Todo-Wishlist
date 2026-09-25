@@ -6,7 +6,10 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { PublicWishlistPurchasedButton } from "@/components/public-wishlist-purchased-button";
+import {
+  PublicWishlistPurchasedButton,
+  type PublicWishlistOwner,
+} from "@/components/public-wishlist-purchased-button";
 
 type WishlistItem = {
   item_id: number;
@@ -25,7 +28,7 @@ type PriorityFilter = "any" | "high" | "medium" | "low";
 type SortOption = "default" | "price-asc" | "price-desc" | "name";
 
 type PublicWishlistItemsListProps = {
-  email: string;
+  owner: PublicWishlistOwner;
   items: WishlistItem[];
 };
 
@@ -53,7 +56,7 @@ function getPriorityChipClasses(priority: number) {
   return "bg-blue-100 text-blue-700 border-blue-200";
 }
 
-export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsListProps) {
+export function PublicWishlistItemsList({ owner, items }: PublicWishlistItemsListProps) {
   const [filter, setFilter] = useState<WishlistFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("any");
   const [sortOption, setSortOption] = useState<SortOption>("default");
@@ -241,7 +244,7 @@ export function PublicWishlistItemsList({ email, items }: PublicWishlistItemsLis
 
                 <div className="flex flex-col items-start gap-1">
                   <PublicWishlistPurchasedButton
-                    email={email}
+                    owner={owner}
                     itemId={item.item_id}
                     purchased={item.purchased}
                     amazonStyle

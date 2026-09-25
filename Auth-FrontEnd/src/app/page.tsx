@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { HeroWishlistLookup } from "@/components/hero-wishlist-lookup";
+import { WishlistShareLink } from "@/components/wishlist-share-link";
 import {
   Card,
   CardContent,
@@ -43,10 +44,8 @@ export default async function Home() {
 
           <Card className="border-blue-200/70 shadow-sm">
             <CardHeader className="items-center text-center">
-              <CardTitle>
-                <Link href="/wishlist" className={ctaButtonClassName}>
-                  Wishlist
-                </Link>
+              <CardTitle className="w-full">
+                <WishlistShareLink userId={session.user.id} />
               </CardTitle>
               <CardDescription className="max-w-xl pt-3 text-base text-muted-foreground">
                 Save the products, goals, and ideas you care about most, then

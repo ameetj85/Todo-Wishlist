@@ -1,11 +1,46 @@
 'use strict';
 
+const crypto = require('crypto');
 const express = require('express');
 const { prisma } = require('../db/prisma');
 const { requireAuth } = require('../middleware/auth');
 const { toSqliteDateOnly } = require('../utils/dates');
+const config = require('../config');
 
 const router = express.Router();
+
+// Share tokens are stateless: base64url(userId) + "." + random nonce + "." + HMAC
+// signature. The nonce makes every generated link unique.
+function signShareTokenPart(payload, nonce) {
+  return crypto
+    .createHmac('sha256', config.shareLink.secret)
+    .update(`${payload}.${nonce}`)
+    .digest();
+}
+
+function signShareToken(userId) {
+  const payload = Buffer.from(userId, 'utf8').toString('base64url');
+  const nonce = crypto.randomBytes(9).toString('base64url');
+  const signature = signShareTokenPart(payload, nonce).toString('base64url');
+  return `${payload}.${nonce}.${signature}`;
+}
+
+function verifyShareToken(token) {
+  const [payload, nonce, signature, extra] = String(token).split('.');
+  if (!payload || !nonce || !signature || extra !== undefined) return null;
+
+  const expected = signShareTokenPart(payload, nonce);
+  const provided = Buffer.from(signature, 'base64url');
+
+  if (
+    provided.length !== expected.length ||
+    !crypto.timingSafeEqual(provided, expected)
+  ) {
+    return null;
+  }
+
+  return Buffer.from(payload, 'base64url').toString('utf8');
+}
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -86,6 +121,27 @@ async function resolveSequenceForCreate(transaction, userId, requestedSequence) 
   return 0;
 }
 
+async function setPublicItemPurchased(res, user, itemId, purchased) {
+  if (!user) {
+    return res.status(404).json({ error: 'Wishlist owner not found' });
+  }
+
+  const result = await prisma.wishlistItem.updateMany({
+    where: { itemId, userId: user.id },
+    data: { purchased },
+  });
+
+  if (result.count === 0) {
+    return res.status(404).json({ error: 'Wishlist item not found' });
+  }
+
+  const item = await prisma.wishlistItem.findFirst({
+    where: { itemId, userId: user.id },
+  });
+
+  return res.json({ item: toWishlistResponse(item) });
+}
+
 router.get('/public/by-email', async (req, res) => {
   const email = String(req.query.email ?? '')
     .trim()
@@ -97,6 +153,34 @@ router.get('/public/by-email', async (req, res) => {
 
   const user = await prisma.user.findFirst({
     where: { email },
+    select: { id: true, name: true },
+  });
+
+  if (!user) {
+    return res.json({ found: false, user: null, items: [] });
+  }
+
+  const items = await prisma.wishlistItem.findMany({
+    where: { userId: user.id },
+    orderBy: [{ sequence: 'asc' }, { createdDate: 'desc' }, { itemId: 'desc' }],
+  });
+
+  return res.json({
+    found: true,
+    user: { name: user.name },
+    items: items.map(toWishlistResponse),
+  });
+});
+
+router.get('/public/by-token', async (req, res) => {
+  const userId = verifyShareToken(String(req.query.token ?? '').trim());
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Invalid share link' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
     select: { id: true, name: true },
   });
 
@@ -140,27 +224,39 @@ router.patch('/public/purchased', async (req, res) => {
     select: { id: true },
   });
 
-  if (!user) {
-    return res.status(404).json({ error: 'Wishlist owner not found' });
+  return setPublicItemPurchased(res, user, itemId, purchased);
+});
+
+router.patch('/public/by-token/purchased', async (req, res) => {
+  const userId = verifyShareToken(String(req.body?.token ?? '').trim());
+  const itemId = parseItemId(req.body?.item_id);
+  const purchased = req.body?.purchased;
+
+  if (!userId) {
+    return res.status(400).json({ error: 'Invalid share link' });
   }
 
-  const result = await prisma.wishlistItem.updateMany({
-    where: { itemId, userId: user.id },
-    data: { purchased },
-  });
-
-  if (result.count === 0) {
-    return res.status(404).json({ error: 'Wishlist item not found' });
+  if (!itemId) {
+    return res.status(400).json({ error: 'Valid item_id is required' });
   }
 
-  const item = await prisma.wishlistItem.findFirst({
-    where: { itemId, userId: user.id },
+  if (typeof purchased !== 'boolean') {
+    return res.status(400).json({ error: 'purchased must be a boolean' });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
   });
 
-  return res.json({ item: toWishlistResponse(item) });
+  return setPublicItemPurchased(res, user, itemId, purchased);
 });
 
 router.use(requireAuth);
+
+router.post('/share-link', (req, res) => {
+  return res.json({ token: signShareToken(req.user.id) });
+});
 
 router.post('/', async (req, res) => {
   const {

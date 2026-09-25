@@ -276,3 +276,55 @@ export async function lookupPublicWishlistByEmailAction(email: string) {
     };
   }
 }
+
+export async function createWishlistShareLinkAction() {
+  const tokenResult = await getToken();
+  if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error };
+
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/wishlist/share-link`, {
+      method: "POST",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${tokenResult.token}`,
+      },
+    });
+
+    const body = (await response.json().catch(() => null)) as { token?: string; error?: string } | null;
+
+    if (!response.ok || !body?.token) {
+      return { ok: false as const, error: body?.error ?? "Unable to create share link" };
+    }
+
+    return { ok: true as const, token: body.token };
+  } catch {
+    return { ok: false as const, error: "Unable to reach wishlist service" };
+  }
+}
+
+export async function toggleSharedWishlistPurchasedAction(payload: {
+  token: string;
+  item_id: number;
+  purchased: boolean;
+}) {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/api/wishlist/public/by-token/purchased`, {
+      method: "PATCH",
+      cache: "no-store",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      return { ok: false as const, error: body?.error ?? "Unable to update purchased status" };
+    }
+
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "Unable to reach wishlist service" };
+  }
+}

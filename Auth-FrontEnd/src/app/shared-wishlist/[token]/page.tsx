@@ -13,7 +13,7 @@ type WishlistItem = {
   purchased: boolean;
 };
 
-type PublicWishlistResponse = {
+type SharedWishlistResponse = {
   found: boolean;
   user: { name: string } | null;
   items: WishlistItem[];
@@ -30,16 +30,16 @@ function getApiBaseUrl() {
   return value.replace(/\/$/, "");
 }
 
-async function fetchPublicWishlist(
-  email: string,
-): Promise<PublicWishlistResponse> {
+async function fetchSharedWishlist(
+  token: string,
+): Promise<SharedWishlistResponse> {
   try {
     const response = await fetch(
-      `${getApiBaseUrl()}/api/wishlist/public/by-email?email=${encodeURIComponent(email)}`,
+      `${getApiBaseUrl()}/api/wishlist/public/by-token?token=${encodeURIComponent(token)}`,
       { cache: "no-store" },
     );
 
-    const payload = (await response.json()) as PublicWishlistResponse;
+    const payload = (await response.json()) as SharedWishlistResponse;
 
     if (!response.ok) {
       return {
@@ -61,40 +61,24 @@ async function fetchPublicWishlist(
   }
 }
 
-export default async function PublicWishlistPage({
-  searchParams,
+export default async function SharedWishlistPage({
+  params,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  params: Promise<{ token: string }>;
 }) {
-  const { email = "" } = await searchParams;
-  const normalizedEmail = email.trim();
-
-  if (!normalizedEmail) {
-    return (
-      <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl items-center px-6 py-12">
-        <Card className="w-full border-border shadow-sm">
-          <CardHeader>
-            <CardTitle>Public Wishlist</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Provide an email address to view a wishlist.
-          </CardContent>
-        </Card>
-      </main>
-    );
-  }
-
-  const result = await fetchPublicWishlist(normalizedEmail);
+  const { token } = await params;
+  const sharedToken = decodeURIComponent(token);
+  const result = await fetchSharedWishlist(sharedToken);
 
   if (!result.found) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-73px)] w-full max-w-3xl items-center px-6 py-12">
         <Card className="w-full border-border shadow-sm">
           <CardHeader>
-            <CardTitle>Public Wishlist</CardTitle>
+            <CardTitle>Shared Wishlist</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {result.error ?? "No wishlist found for this email address."}
+            {result.error ?? "This wishlist link is no longer available."}
           </CardContent>
         </Card>
       </main>
@@ -108,7 +92,7 @@ export default async function PublicWishlistPage({
           <CardTitle className="text-2xl font-semibold text-foreground">
             {result.user?.name ?? "User"}&apos;s Wishlist
           </CardTitle>
-          <p className="text-sm text-muted-foreground">Viewing wishlist for: {normalizedEmail}</p>
+          <p className="text-sm text-muted-foreground">Shared wishlist</p>
         </CardHeader>
         <CardContent className="border-t border-border pt-3 text-sm text-muted-foreground">
           {result.items.length} item{result.items.length === 1 ? "" : "s"}
@@ -122,7 +106,7 @@ export default async function PublicWishlistPage({
           </CardContent>
         </Card>
       ) : (
-        <PublicWishlistItemsList owner={{ email: normalizedEmail }} items={result.items} />
+        <PublicWishlistItemsList owner={{ shareToken: sharedToken }} items={result.items} />
       )}
     </main>
   );

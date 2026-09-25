@@ -116,6 +116,81 @@ describe('Wishlist CRUD Routes', () => {
     assert.equal(res.body.items[0].title, 'Public Item');
   });
 
+  it('creates a new share link each time that exposes the wishlist read-only', async () => {
+    const token = await signupAndGetToken('share-owner@example.com');
+    const auth = { Authorization: `Bearer ${token}` };
+
+    await request(app, 'POST', '/api/wishlist', { title: 'Shared Item' }, auth);
+
+    const created = await request(app, 'POST', '/api/wishlist/share-link', null, auth);
+    assert.equal(created.status, 200);
+    assert.ok(created.body.token);
+
+    const recreated = await request(app, 'POST', '/api/wishlist/share-link', null, auth);
+    assert.equal(recreated.status, 200);
+    assert.notEqual(recreated.body.token, created.body.token);
+
+    for (const shareToken of [created.body.token, recreated.body.token]) {
+      const shared = await request(
+        app,
+        'GET',
+        `/api/wishlist/public/by-token?token=${encodeURIComponent(shareToken)}`,
+      );
+      assert.equal(shared.status, 200);
+      assert.equal(shared.body.found, true);
+      assert.equal(shared.body.user.name, 'Wish User');
+      assert.equal(shared.body.items[0].title, 'Shared Item');
+    }
+  });
+
+  it('allows share link viewers to toggle purchased status', async () => {
+    const token = await signupAndGetToken('share-toggle-owner@example.com');
+    const auth = { Authorization: `Bearer ${token}` };
+
+    const created = await request(app, 'POST', '/api/wishlist', { title: 'Toggle Item' }, auth);
+    const itemId = created.body.item.item_id;
+    const link = await request(app, 'POST', '/api/wishlist/share-link', null, auth);
+
+    const patchRes = await request(app, 'PATCH', '/api/wishlist/public/by-token/purchased', {
+      token: link.body.token,
+      item_id: itemId,
+      purchased: true,
+    });
+    assert.equal(patchRes.status, 200);
+    assert.equal(patchRes.body.item.purchased, true);
+
+    const unpatchRes = await request(app, 'PATCH', '/api/wishlist/public/by-token/purchased', {
+      token: link.body.token,
+      item_id: itemId,
+      purchased: false,
+    });
+    assert.equal(unpatchRes.status, 200);
+    assert.equal(unpatchRes.body.item.purchased, false);
+
+    const forged = await request(app, 'PATCH', '/api/wishlist/public/by-token/purchased', {
+      token: `${link.body.token}x`,
+      item_id: itemId,
+      purchased: true,
+    });
+    assert.equal(forged.status, 400);
+  });
+
+  it('rejects share link creation without auth and tampered share tokens', async () => {
+    const unauth = await request(app, 'POST', '/api/wishlist/share-link');
+    assert.equal(unauth.status, 401);
+
+    const forgedPayload = Buffer.from('some-user-id').toString('base64url');
+    const forged = await request(
+      app,
+      'GET',
+      `/api/wishlist/public/by-token?token=${forgedPayload}.someNonce.bogusSignature`,
+    );
+    assert.equal(forged.status, 400);
+
+    const malformed = await request(app, 'GET', '/api/wishlist/public/by-token?token=bad');
+    assert.equal(malformed.status, 400);
+  });
+
   it('returns not found payload for unknown public wishlist email', async () => {
     const res = await request(
       app,
