@@ -9,6 +9,7 @@ import {
 import { getAuthToken } from "@/lib/auth-cookie";
 import { getSessionData } from "@/lib/session";
 import { WishlistItemsList } from "@/components/wishlist-items-list";
+import { DataTransferControls } from "@/components/data-transfer-controls";
 
 type WishlistItem = {
   item_id: number;
@@ -95,8 +96,11 @@ export default async function WishlistPage() {
             Manage your own wishlist items with quick edit/delete controls.
           </p>
         </CardHeader>
-        <CardContent className="border-t border-border pt-3 text-sm text-muted-foreground">
-          {wishlist.items.length} item{wishlist.items.length === 1 ? "" : "s"}
+        <CardContent className="flex flex-col gap-3 border-t border-border pt-3 text-sm text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+          <span className="sm:pt-2.5">
+            {wishlist.items.length} item{wishlist.items.length === 1 ? "" : "s"}
+          </span>
+          <DataTransferControls kind="wishlist" />
         </CardContent>
       </Card>
 

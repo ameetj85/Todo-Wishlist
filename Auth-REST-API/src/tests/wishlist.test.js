@@ -445,4 +445,76 @@ describe('Wishlist CRUD Routes', () => {
     const res = await request(app, 'GET', '/api/wishlist');
     assert.equal(res.status, 401);
   });
+
+  it('imports exported wishlist items in append and replace modes', async () => {
+    const token = await signupAndGetToken();
+    const auth = { Authorization: `Bearer ${token}` };
+    const image = Buffer.from('fake-image-bytes').toString('base64');
+
+    await request(app, 'POST', '/api/wishlist', { title: 'Existing' }, auth);
+    const exported = await request(app, 'GET', '/api/wishlist', null, auth);
+
+    const appendRes = await request(
+      app,
+      'POST',
+      '/api/wishlist/import',
+      {
+        mode: 'append',
+        items: [
+          { title: 'First import', price: 12.5, priority: 0, item_image: image },
+          { title: 'Second import', quantity: 2, purchased: true },
+        ],
+      },
+      auth,
+    );
+    assert.equal(appendRes.status, 200);
+    assert.deepEqual(appendRes.body, { imported: 2, removed: 0 });
+
+    const afterAppend = await request(app, 'GET', '/api/wishlist', null, auth);
+    assert.deepEqual(
+      afterAppend.body.items.map((item) => item.title),
+      ['Existing', 'First import', 'Second import'],
+    );
+    assert.equal(afterAppend.body.items[1].item_image, image);
+    assert.equal(afterAppend.body.items[1].price, 12.5);
+    assert.equal(afterAppend.body.items[2].purchased, true);
+
+    const replaceRes = await request(
+      app,
+      'POST',
+      '/api/wishlist/import',
+      { mode: 'replace', items: exported.body.items },
+      auth,
+    );
+    assert.deepEqual(replaceRes.body, { imported: 1, removed: 3 });
+
+    const afterReplace = await request(app, 'GET', '/api/wishlist', null, auth);
+    assert.deepEqual(
+      afterReplace.body.items.map((item) => item.title),
+      ['Existing'],
+    );
+  });
+
+  it('rejects invalid wishlist imports without changing data', async () => {
+    const token = await signupAndGetToken();
+    const auth = { Authorization: `Bearer ${token}` };
+
+    await request(app, 'POST', '/api/wishlist', { title: 'Keep me' }, auth);
+
+    const res = await request(
+      app,
+      'POST',
+      '/api/wishlist/import',
+      { mode: 'replace', items: [{ title: 'Valid' }, { title: 'Bad', priority: 7 }] },
+      auth,
+    );
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /^items\[1\]: priority/);
+
+    const list = await request(app, 'GET', '/api/wishlist', null, auth);
+    assert.deepEqual(
+      list.body.items.map((item) => item.title),
+      ['Keep me'],
+    );
+  });
 });

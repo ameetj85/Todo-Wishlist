@@ -10,6 +10,7 @@ import {
 import { getAuthToken } from "@/lib/auth-cookie";
 import { getSessionData } from "@/lib/session";
 import { TodoItemsList } from "@/components/todo-items-list";
+import { DataTransferControls } from "@/components/data-transfer-controls";
 
 type TodoItem = {
   todo_id: number;
@@ -121,8 +122,11 @@ export default async function TodoPage({
             </div>
           ) : null}
         </CardHeader>
-        <CardContent className="border-t border-border pt-3 text-sm text-muted-foreground">
-          {todoList.todos.length} todo{todoList.todos.length === 1 ? "" : "s"}
+        <CardContent className="flex flex-col gap-3 border-t border-border pt-3 text-sm text-muted-foreground sm:flex-row sm:items-start sm:justify-between">
+          <span className="sm:pt-2.5">
+            {todoList.todos.length} todo{todoList.todos.length === 1 ? "" : "s"}
+          </span>
+          <DataTransferControls kind="todos" />
         </CardContent>
       </Card>
 

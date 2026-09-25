@@ -38,6 +38,116 @@ function isValidDateTime(value) {
   return !Number.isNaN(Date.parse(value));
 }
 
+const MAX_IMPORT_RECORDS = 5000;
+const IMPORT_MODES = ['append', 'replace'];
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isOptionalBoolean(value) {
+  return value === undefined || typeof value === 'boolean';
+}
+
+// Validates one exported todo and maps it to Prisma data (ids are ignored).
+function parseImportedTodo(raw, userId) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { error: 'must be an object' };
+  }
+
+  const {
+    name,
+    description,
+    category,
+    due_date,
+    completed,
+    remind_me,
+    reminder_date,
+    reminder_sent,
+    created_date,
+  } = raw;
+
+  if (!isNonEmptyString(name)) return { error: 'name is required' };
+  if (!isNonEmptyString(description)) return { error: 'description is required' };
+  if (!isNonEmptyString(category)) return { error: 'category is required' };
+  if (
+    due_date !== undefined &&
+    due_date !== null &&
+    (typeof due_date !== 'string' || !isValidDate(due_date))
+  ) {
+    return { error: 'due_date must be null or YYYY-MM-DD format' };
+  }
+  if (!isOptionalBoolean(completed)) return { error: 'completed must be a boolean' };
+  if (!isOptionalBoolean(remind_me)) return { error: 'remind_me must be a boolean' };
+  if (
+    reminder_date !== undefined &&
+    reminder_date !== null &&
+    (typeof reminder_date !== 'string' || !isValidDateTime(reminder_date))
+  ) {
+    return { error: 'reminder_date must be null or a valid datetime' };
+  }
+  if (!isOptionalBoolean(reminder_sent)) {
+    return { error: 'reminder_sent must be a boolean' };
+  }
+  if (reminder_sent === true && (reminder_date ?? null) === null) {
+    return { error: 'reminder_date is required when reminder_sent is true' };
+  }
+
+  return {
+    data: {
+      userId,
+      name: name.trim(),
+      description: description.trim(),
+      category: category.trim(),
+      dueDate: due_date ?? null,
+      completed: !!completed,
+      remindMe: !!remind_me,
+      reminderDate: reminder_date ?? null,
+      reminderSent: !!reminder_sent,
+      createdDate:
+        typeof created_date === 'string' && isValidDate(created_date)
+          ? created_date
+          : toSqliteDateOnly(Date.now()),
+    },
+  };
+}
+
+router.post('/import', async (req, res) => {
+  const { mode = 'append', todos } = req.body ?? {};
+
+  if (!IMPORT_MODES.includes(mode)) {
+    return res.status(400).json({ error: 'mode must be "append" or "replace"' });
+  }
+  if (!Array.isArray(todos)) {
+    return res.status(400).json({ error: 'todos must be an array' });
+  }
+  if (todos.length > MAX_IMPORT_RECORDS) {
+    return res
+      .status(400)
+      .json({ error: `Cannot import more than ${MAX_IMPORT_RECORDS} todos at once` });
+  }
+
+  const rows = [];
+  for (const [index, raw] of todos.entries()) {
+    const parsed = parseImportedTodo(raw, req.user.id);
+    if (parsed.error) {
+      return res.status(400).json({ error: `todos[${index}]: ${parsed.error}` });
+    }
+    rows.push(parsed.data);
+  }
+
+  const result = await prisma.$transaction(async (transaction) => {
+    const removed =
+      mode === 'replace'
+        ? (await transaction.todo.deleteMany({ where: { userId: req.user.id } })).count
+        : 0;
+    const created = await transaction.todo.createMany({ data: rows });
+    return { imported: created.count, removed };
+  });
+
+  return res.json(result);
+});
+
 router.post('/', async (req, res) => {
   const {
     name,

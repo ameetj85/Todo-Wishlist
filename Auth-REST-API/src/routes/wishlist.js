@@ -258,6 +258,114 @@ router.post('/share-link', (req, res) => {
   return res.json({ token: signShareToken(req.user.id) });
 });
 
+const MAX_IMPORT_RECORDS = 5000;
+const IMPORT_MODES = ['append', 'replace'];
+const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
+
+// Validates one exported wishlist item and maps it to Prisma data (ids are ignored).
+function parseImportedWishlistItem(raw, userId) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { error: 'must be an object' };
+  }
+
+  const { title, description, url, item_image, price, priority, quantity, purchased } =
+    raw;
+
+  if (typeof title !== 'string' || !title.trim()) {
+    return { error: 'title is required' };
+  }
+  if (description !== undefined && description !== null && typeof description !== 'string') {
+    return { error: 'description must be a string or null' };
+  }
+  if (url !== undefined && url !== null && typeof url !== 'string') {
+    return { error: 'url must be a string or null' };
+  }
+  if (
+    item_image !== undefined &&
+    item_image !== null &&
+    (typeof item_image !== 'string' || !BASE64_PATTERN.test(item_image))
+  ) {
+    return { error: 'item_image must be a base64 string or null' };
+  }
+  const parsedPrice = parsePrice(price);
+  if (parsedPrice.error) return { error: parsedPrice.error };
+  if (priority !== undefined && ![0, 1, 2].includes(priority)) {
+    return { error: 'priority must be one of 0, 1, or 2' };
+  }
+  if (quantity !== undefined) {
+    const quantityErr = parseInteger(quantity, 'quantity', { min: 1 });
+    if (quantityErr) return { error: quantityErr };
+  }
+  if (purchased !== undefined && typeof purchased !== 'boolean') {
+    return { error: 'purchased must be a boolean' };
+  }
+
+  return {
+    data: {
+      userId,
+      title: title.trim(),
+      description: description ?? null,
+      url: url ?? null,
+      itemImage: item_image ? Buffer.from(item_image, 'base64') : null,
+      price: parsedPrice.value,
+      priority: priority ?? 1,
+      quantity: quantity ?? 1,
+      purchased: !!purchased,
+      createdDate: toSqliteDateOnly(Date.now()),
+    },
+  };
+}
+
+router.post('/import', async (req, res) => {
+  const { mode = 'append', items } = req.body ?? {};
+
+  if (!IMPORT_MODES.includes(mode)) {
+    return res.status(400).json({ error: 'mode must be "append" or "replace"' });
+  }
+  if (!Array.isArray(items)) {
+    return res.status(400).json({ error: 'items must be an array' });
+  }
+  if (items.length > MAX_IMPORT_RECORDS) {
+    return res
+      .status(400)
+      .json({ error: `Cannot import more than ${MAX_IMPORT_RECORDS} items at once` });
+  }
+
+  const rows = [];
+  for (const [index, raw] of items.entries()) {
+    const parsed = parseImportedWishlistItem(raw, req.user.id);
+    if (parsed.error) {
+      return res.status(400).json({ error: `items[${index}]: ${parsed.error}` });
+    }
+    rows.push(parsed.data);
+  }
+
+  const result = await prisma.$transaction(async (transaction) => {
+    let removed = 0;
+    let nextSequence = 0;
+
+    if (mode === 'replace') {
+      removed = (
+        await transaction.wishlistItem.deleteMany({ where: { userId: req.user.id } })
+      ).count;
+    } else {
+      // Appended items keep their file order, placed after the existing list.
+      const last = await transaction.wishlistItem.aggregate({
+        where: { userId: req.user.id },
+        _max: { sequence: true },
+      });
+      nextSequence = last._max.sequence === null ? 0 : last._max.sequence + 1;
+    }
+
+    const created = await transaction.wishlistItem.createMany({
+      data: rows.map((row, index) => ({ ...row, sequence: nextSequence + index })),
+    });
+    return { imported: created.count, removed };
+  });
+
+  return res.json(result);
+});
+
 router.post('/', async (req, res) => {
   const {
     title,

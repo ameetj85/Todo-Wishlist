@@ -414,4 +414,102 @@ describe('Todo CRUD Routes', () => {
     assert.equal(res.status, 400);
     assert.equal(res.body.error, 'Invalid todo_id');
   });
+
+  it('imports exported todos in append and replace modes', async () => {
+    const token = await signupAndGetToken();
+    const auth = { Authorization: `Bearer ${token}` };
+
+    await request(
+      app,
+      'POST',
+      '/api/todos',
+      { name: 'Existing', description: 'Already here', category: 'Work' },
+      auth,
+    );
+    const exported = await request(app, 'GET', '/api/todos', null, auth);
+
+    const appendRes = await request(
+      app,
+      'POST',
+      '/api/todos/import',
+      {
+        mode: 'append',
+        todos: [
+          ...exported.body.todos,
+          {
+            name: 'Imported',
+            description: 'From file',
+            category: 'Personal',
+            due_date: '2026-01-15',
+            completed: true,
+            created_date: '2025-12-01',
+          },
+        ],
+      },
+      auth,
+    );
+    assert.equal(appendRes.status, 200);
+    assert.deepEqual(appendRes.body, { imported: 2, removed: 0 });
+
+    const afterAppend = await request(app, 'GET', '/api/todos', null, auth);
+    assert.equal(afterAppend.body.todos.length, 3);
+    const imported = afterAppend.body.todos.find((todo) => todo.name === 'Imported');
+    assert.equal(imported.completed, true);
+    assert.equal(imported.created_date, '2025-12-01');
+
+    const replaceRes = await request(
+      app,
+      'POST',
+      '/api/todos/import',
+      { mode: 'replace', todos: exported.body.todos },
+      auth,
+    );
+    assert.deepEqual(replaceRes.body, { imported: 1, removed: 3 });
+
+    const afterReplace = await request(app, 'GET', '/api/todos', null, auth);
+    assert.equal(afterReplace.body.todos.length, 1);
+    assert.equal(afterReplace.body.todos[0].name, 'Existing');
+  });
+
+  it('rejects invalid todo imports without changing data', async () => {
+    const token = await signupAndGetToken();
+    const auth = { Authorization: `Bearer ${token}` };
+
+    await request(
+      app,
+      'POST',
+      '/api/todos',
+      { name: 'Keep me', description: 'Safe', category: 'Work' },
+      auth,
+    );
+
+    const res = await request(
+      app,
+      'POST',
+      '/api/todos/import',
+      {
+        mode: 'replace',
+        todos: [
+          { name: 'Valid', description: 'ok', category: 'Work' },
+          { name: 'Bad date', description: 'x', category: 'Work', due_date: '01/02/2026' },
+        ],
+      },
+      auth,
+    );
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /^todos\[1\]: due_date/);
+
+    const list = await request(app, 'GET', '/api/todos', null, auth);
+    assert.equal(list.body.todos.length, 1);
+    assert.equal(list.body.todos[0].name, 'Keep me');
+
+    const badMode = await request(
+      app,
+      'POST',
+      '/api/todos/import',
+      { mode: 'merge', todos: [] },
+      auth,
+    );
+    assert.equal(badMode.status, 400);
+  });
 });
