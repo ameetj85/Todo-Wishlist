@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PublicWishlistItemsList } from "@/components/public-wishlist-items-list";
 
@@ -60,6 +61,10 @@ async function fetchPublicWishlist(
     };
   }
 }
+
+export const metadata: Metadata = {
+  title: "Public Wishlist",
+};
 
 export default async function PublicWishlistPage({
   searchParams,

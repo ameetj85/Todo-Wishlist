@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
@@ -9,6 +10,10 @@ import {
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+
+export const metadata: Metadata = {
+  title: "Verify Your Email",
+};
 
 export default function VerifyEmailSentPage() {
   return (

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PublicWishlistItemsList } from "@/components/public-wishlist-items-list";
 
@@ -60,6 +61,10 @@ async function fetchSharedWishlist(
     };
   }
 }
+
+export const metadata: Metadata = {
+  title: "Shared Wishlist",
+};
 
 export default async function SharedWishlistPage({
   params,

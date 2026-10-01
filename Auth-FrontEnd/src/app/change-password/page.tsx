@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import {
@@ -9,6 +10,10 @@ import {
 } from "@/components/ui/card";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { getSessionData } from "@/lib/session";
+
+export const metadata: Metadata = {
+  title: "Change Password",
+};
 
 export default async function ChangePasswordPage() {
   const session = await getSessionData();

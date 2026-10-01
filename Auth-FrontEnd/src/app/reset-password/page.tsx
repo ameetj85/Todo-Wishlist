@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
@@ -13,6 +14,10 @@ import { Separator } from "@/components/ui/separator";
 
 type ResetPasswordPageProps = {
   searchParams: Promise<{ token?: string; from?: string }>;
+};
+
+export const metadata: Metadata = {
+  title: "Reset Password",
 };
 
 export default async function ResetPasswordPage({

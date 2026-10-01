@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import {
@@ -71,6 +72,10 @@ async function fetchWishlist(token: string): Promise<WishlistResponse> {
 }
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "My Wishlist",
+};
 
 export default async function WishlistPage() {
   const session = await getSessionData();

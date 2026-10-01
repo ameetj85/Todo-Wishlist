@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LoginForm } from "@/components/auth/login-form";
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 
 type LoginPageProps = {
   searchParams: Promise<{ next?: string; from?: string }>;
+};
+
+export const metadata: Metadata = {
+  title: "Log In",
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {

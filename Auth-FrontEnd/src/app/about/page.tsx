@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 
@@ -11,6 +12,10 @@ import {
 import { getSessionData } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "About",
+};
 
 export default async function AboutPage() {
   const session = await getSessionData();

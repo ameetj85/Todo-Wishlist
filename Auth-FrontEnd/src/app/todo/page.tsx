@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -75,6 +76,10 @@ async function fetchTodos(token: string, dueTodayOpenOnly: boolean): Promise<Tod
 }
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Todo List",
+};
 
 export default async function TodoPage({
   searchParams,

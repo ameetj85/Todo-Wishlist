@@ -18,7 +18,10 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "My Todo",
+  title: {
+    default: "Smashing Apps",
+    template: "%s | Smashing Apps",
+  },
   description: "Next.js frontend for Auth REST API",
 };
 

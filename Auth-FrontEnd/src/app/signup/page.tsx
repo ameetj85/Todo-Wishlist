@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CloudCog, LockKeyhole, MailCheck, UserX } from "lucide-react";
 
@@ -12,6 +13,10 @@ import {
 import { isRegistrationOpen } from "@/lib/registration";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Sign Up",
+};
 
 export default function SignupPage() {
   if (!isRegistrationOpen()) {
