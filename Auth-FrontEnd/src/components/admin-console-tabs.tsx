@@ -97,14 +97,23 @@ export function AdminConsoleTabs({ users, todos, wishlists }: AdminConsoleTabsPr
     created_date: "",
   });
 
+  const emailByUserId = new Map(usersState.map((user) => [user.id, user.email.toLowerCase()]));
+
+  function matchesUserFilter(userId: string, userName: string, filter: string) {
+    return (
+      userName.toLowerCase().includes(filter) ||
+      (emailByUserId.get(userId) ?? "").includes(filter)
+    );
+  }
+
   const normalizedTodoUserFilter = todoUserFilter.trim().toLowerCase();
   const filteredTodos = todosState.filter((todo) =>
-    todo.user_name.toLowerCase().includes(normalizedTodoUserFilter),
+    matchesUserFilter(todo.user_id, todo.user_name, normalizedTodoUserFilter),
   );
 
   const normalizedWishlistUserFilter = wishlistUserFilter.trim().toLowerCase();
   const filteredWishlists = wishlistsState.filter((item) =>
-    item.user_name.toLowerCase().includes(normalizedWishlistUserFilter),
+    matchesUserFilter(item.user_id, item.user_name, normalizedWishlistUserFilter),
   );
 
   function closeUserModal() {
@@ -451,7 +460,7 @@ export function AdminConsoleTabs({ users, todos, wishlists }: AdminConsoleTabsPr
             <Input
               value={todoUserFilter}
               onChange={(event) => setTodoUserFilter(event.target.value)}
-              placeholder="Filter by user name"
+              placeholder="Filter by user name or email"
               className="h-8 w-full sm:w-64"
             />
           </div>
@@ -499,7 +508,7 @@ export function AdminConsoleTabs({ users, todos, wishlists }: AdminConsoleTabsPr
             <Input
               value={wishlistUserFilter}
               onChange={(event) => setWishlistUserFilter(event.target.value)}
-              placeholder="Filter by user name"
+              placeholder="Filter by user name or email"
               className="h-8 w-full sm:w-64"
             />
           </div>
