@@ -10,6 +10,11 @@ import {
   PublicWishlistPurchasedButton,
   type PublicWishlistOwner,
 } from "@/components/public-wishlist-purchased-button";
+import {
+  WishlistViewToggle,
+  useWishlistViewMode,
+  type WishlistViewMode,
+} from "@/components/wishlist-view-toggle";
 
 type WishlistItem = {
   item_id: number;
@@ -60,6 +65,7 @@ export function PublicWishlistItemsList({ owner, items }: PublicWishlistItemsLis
   const [filter, setFilter] = useState<WishlistFilter>("all");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("any");
   const [sortOption, setSortOption] = useState<SortOption>("default");
+  const [viewMode, setViewMode] = useWishlistViewMode();
 
   const filteredItems = useMemo(
     () =>
@@ -100,6 +106,70 @@ export function PublicWishlistItemsList({ owner, items }: PublicWishlistItemsLis
       );
     });
   }, [filteredItems, sortOption]);
+
+  function renderItemImage(item: WishlistItem, layout: WishlistViewMode) {
+    const sizeClasses = layout === "grid" ? "aspect-square h-auto w-full" : "h-20 w-20";
+
+    if (item.item_image) {
+      return (
+        <Image
+          src={`data:image/*;base64,${item.item_image}`}
+          alt={item.title}
+          width={layout === "grid" ? 320 : 80}
+          height={layout === "grid" ? 320 : 80}
+          unoptimized
+          className={`${sizeClasses} rounded-lg border border-border bg-muted/40 object-cover`}
+        />
+      );
+    }
+
+    return (
+      <div
+        className={`${sizeClasses} flex items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground`}
+      >
+        <Package className={layout === "grid" ? "size-12" : "size-8"} />
+      </div>
+    );
+  }
+
+  function renderItemDetails(item: WishlistItem) {
+    return (
+      <div className="min-w-0 space-y-2">
+        <p className="truncate text-[15px] font-medium text-foreground" title={item.title}>
+          {item.title}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getPriorityChipClasses(item.priority)}`}
+          >
+            {getPriorityLabel(item.priority)} Priority
+          </span>
+
+          {item.purchased ? (
+            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
+              Purchased
+            </span>
+          ) : null}
+        </div>
+
+        {item.url ? (
+          <Link
+            href={normalizeItemUrl(item.url) ?? "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-primary hover:text-primary/80"
+            title={item.url}
+          >
+            <span className="truncate">View Product</span>
+            <ExternalLink className="size-3.5 shrink-0" />
+          </Link>
+        ) : (
+          <p className="text-sm text-muted-foreground">No product link</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -167,11 +237,40 @@ export function PublicWishlistItemsList({ owner, items }: PublicWishlistItemsLis
             <option value="name">Name: A to Z</option>
           </select>
         </div>
+
+        <div className="ml-auto">
+          <WishlistViewToggle value={viewMode} onChange={setViewMode} />
+        </div>
       </div>
 
       {sortedItems.length === 0 ? (
         <div className="rounded-xl border border-border bg-card px-4 py-6 text-sm text-muted-foreground shadow-sm">
           No items match this filter.
+        </div>
+      ) : viewMode === "grid" ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+          {sortedItems.map((item) => (
+            <div
+              key={item.item_id}
+              className={`flex flex-col gap-3 rounded-xl border border-border p-3 shadow-sm ${item.purchased ? "bg-muted/40" : "bg-card"}`}
+            >
+              {renderItemImage(item, "grid")}
+
+              <div className="min-w-0 flex-1">{renderItemDetails(item)}</div>
+
+              <div className="flex items-center gap-2 border-t border-border/70 pt-3">
+                <div className="text-lg font-semibold text-foreground">${item.price.toFixed(2)}</div>
+                <div className="text-sm font-medium text-muted-foreground">Qty {item.quantity}</div>
+              </div>
+
+              <PublicWishlistPurchasedButton
+                owner={owner}
+                itemId={item.item_id}
+                purchased={item.purchased}
+                amazonStyle
+              />
+            </div>
+          ))}
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -189,55 +288,9 @@ export function PublicWishlistItemsList({ owner, items }: PublicWishlistItemsLis
               className={`border-b border-border/60 px-4 py-4 last:border-b-0 ${item.purchased ? "bg-muted/40" : "bg-card"}`}
             >
               <div className="grid gap-3 md:grid-cols-[96px_minmax(0,1fr)_110px_80px_160px] md:items-center md:gap-4">
-                {item.item_image ? (
-                  <Image
-                    src={`data:image/*;base64,${item.item_image}`}
-                    alt={item.title}
-                    width={80}
-                    height={80}
-                    unoptimized
-                    className="h-20 w-20 rounded-lg border border-border bg-muted/40 object-cover"
-                  />
-                ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-lg border border-border bg-muted/40 text-muted-foreground">
-                    <Package className="size-8" />
-                  </div>
-                )}
+                {renderItemImage(item, "list")}
 
-                <div className="min-w-0 space-y-2">
-                  <p className="truncate text-[15px] font-medium text-foreground" title={item.title}>
-                    {item.title}
-                  </p>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getPriorityChipClasses(item.priority)}`}
-                    >
-                      {getPriorityLabel(item.priority)} Priority
-                    </span>
-
-                    {item.purchased ? (
-                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                        Purchased
-                      </span>
-                    ) : null}
-                  </div>
-
-                  {item.url ? (
-                    <Link
-                      href={normalizeItemUrl(item.url) ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-primary hover:text-primary/80"
-                      title={item.url}
-                    >
-                      <span className="truncate">View Product</span>
-                      <ExternalLink className="size-3.5 shrink-0" />
-                    </Link>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No product link</p>
-                  )}
-                </div>
+                {renderItemDetails(item)}
 
                 <div className="text-lg font-semibold text-foreground">${item.price.toFixed(2)}</div>
                 <div className="text-sm font-medium text-muted-foreground">{item.quantity}</div>
