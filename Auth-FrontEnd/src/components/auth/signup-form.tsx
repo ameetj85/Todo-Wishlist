@@ -1,5 +1,6 @@
 "use client";
 
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
@@ -10,6 +11,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const initialState: ActionState = {};
+
+// Mirrors validatePassword in Auth-REST-API/src/validators/index.js
+const passwordRequirements = [
+  { label: "At least 8 characters", test: (value: string) => value.length >= 8 },
+  { label: "One uppercase letter", test: (value: string) => /[A-Z]/.test(value) },
+  { label: "One number", test: (value: string) => /[0-9]/.test(value) },
+];
 
 export function SignupForm() {
   const [state, formAction] = useActionState(signupAction, initialState);
@@ -59,7 +67,28 @@ export function SignupForm() {
           required
           value={password}
           onChange={(event) => setPassword(event.target.value)}
+          aria-describedby="password-requirements"
         />
+        <ul
+          id="password-requirements"
+          className="grid list-disc grid-cols-1 gap-x-6 gap-y-1 pl-5 text-sm sm:grid-cols-2"
+        >
+          {passwordRequirements.map((requirement) => {
+            const met = requirement.test(password);
+            return (
+              <li
+                key={requirement.label}
+                className={met ? "text-emerald-600" : "text-muted-foreground"}
+              >
+                <span className="inline-flex items-center gap-1">
+                  {requirement.label}
+                  {met ? <Check className="size-4" aria-hidden="true" /> : null}
+                </span>
+                <span className="sr-only">{met ? " (met)" : " (not met)"}</span>
+              </li>
+            );
+          })}
+        </ul>
       </div>
 
       <div className="space-y-2">
