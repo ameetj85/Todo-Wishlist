@@ -51,6 +51,7 @@ npm run dev        # development (auto-restart on file changes)
 | `npm run db:seed`       | Insert sample dev/test users and todos |
 | `npm run db:reset`      | ⚠️ Drop and recreate database          |
 | `npm run db:cleanup`    | Remove expired sessions & tokens       |
+| `npm run db:recompress-images` | One-off: re-encode stored wishlist images as ≤640px WebP. Dry run by default; add `-- --apply` to back up the database and write changes. Needs dev dependencies (`sharp`) |
 | `npm run check:env`     | Validate all environment variables     |
 
 ---
@@ -85,6 +86,7 @@ auth-api/
 │   ├── db-reset.js              # npm run db:reset
 │   ├── db-seed.js               # npm run db:seed
 │   ├── db-cleanup.js            # npm run db:cleanup
+│   ├── db-recompress-images.js  # npm run db:recompress-images
 │   └── check-env.js             # npm run check:env
 │
 └── tests/

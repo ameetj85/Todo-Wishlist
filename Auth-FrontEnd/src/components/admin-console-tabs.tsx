@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createAdminUserAction, updateAdminUserAction } from "@/app/actions/admin-users";
 import { updateAdminWishlistAction } from "@/app/actions/admin-wishlists";
+import { compressWishlistImageAction } from "@/app/actions/wishlist";
+import { readImageFileForUpload } from "@/lib/image-upload";
 
 type AdminUser = {
   id: string;
@@ -151,22 +153,15 @@ export function AdminConsoleTabs({ users, todos, wishlists }: AdminConsoleTabsPr
     setIsConvertingWishlistImage(true);
 
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
+      const base64 = await readImageFileForUpload(file);
+      const payload = await compressWishlistImageAction(base64);
 
-        reader.onload = () => resolve(String(reader.result ?? ""));
-        reader.onerror = () => reject(new Error("Unable to read image file"));
-        reader.readAsDataURL(file);
-      });
-
-      const commaIndex = dataUrl.indexOf(",");
-      const base64 = commaIndex >= 0 ? dataUrl.slice(commaIndex + 1) : "";
-
-      if (!base64) {
-        throw new Error("Unable to extract image data");
+      if (!payload.ok) {
+        setWishlistModalError(payload.error);
+        return;
       }
 
-      setWishlistForm((prev) => ({ ...prev, item_image: base64 }));
+      setWishlistForm((prev) => ({ ...prev, item_image: payload.imageBase64 }));
     } catch {
       setWishlistModalError("Unable to process selected image");
     } finally {
@@ -756,7 +751,7 @@ export function AdminConsoleTabs({ users, todos, wishlists }: AdminConsoleTabsPr
                 </div>
                 {wishlistForm.item_image ? (
                   <Image
-                    src={`data:image/png;base64,${wishlistForm.item_image}`}
+                    src={`data:image/*;base64,${wishlistForm.item_image}`}
                     alt="Wishlist preview"
                     width={96}
                     height={96}

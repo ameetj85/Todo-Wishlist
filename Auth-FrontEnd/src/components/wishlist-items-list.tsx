@@ -11,9 +11,11 @@ import { Label } from "@/components/ui/label";
 import {
   createWishlistItemAction,
   deleteWishlistItemAction,
+  compressWishlistImageAction,
   extractWishlistImageAction,
   updateWishlistItemAction,
 } from "@/app/actions/wishlist";
+import { readImageFileForUpload } from "@/lib/image-upload";
 import {
   WishlistViewToggle,
   useWishlistViewMode,
@@ -83,6 +85,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
   const [purchasedDeleteAcknowledged, setPurchasedDeleteAcknowledged] = useState(false);
   const [itemImageBase64, setItemImageBase64] = useState<string | null>(null);
   const [isExtractingImage, setIsExtractingImage] = useState(false);
+  const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [urlImageUnavailable, setUrlImageUnavailable] = useState(false);
   const [visibleImageItemIds, setVisibleImageItemIds] = useState<number[]>([]);
   const [form, setForm] = useState<NewItemForm>({
@@ -229,6 +232,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
     });
     setItemImageBase64(null);
     setIsExtractingImage(false);
+    setIsProcessingImage(false);
     setUrlImageUnavailable(false);
     setEditingItemId(null);
     setEditingItem(null);
@@ -263,27 +267,25 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
       return;
     }
 
-    const base64 = await new Promise<string | null>((resolve) => {
-      const reader = new FileReader();
-
-      reader.onload = () => {
-        const result = String(reader.result ?? "");
-        const parts = result.split(",");
-        resolve(parts.length > 1 ? parts[1] : null);
-      };
-
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(file);
-    });
-
-    if (!base64) {
-      setError("Unable to read uploaded image");
-      return;
-    }
-
-    setItemImageBase64(base64);
-    setUrlImageUnavailable(false);
     setError(null);
+    setIsProcessingImage(true);
+
+    try {
+      const base64 = await readImageFileForUpload(file);
+      const payload = await compressWishlistImageAction(base64);
+
+      if (!payload.ok) {
+        setError(payload.error);
+        return;
+      }
+
+      setItemImageBase64(payload.imageBase64);
+      setUrlImageUnavailable(false);
+    } catch {
+      setError("Unable to read uploaded image");
+    } finally {
+      setIsProcessingImage(false);
+    }
   }
 
   async function saveItem() {
@@ -706,7 +708,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                       variant="outline"
                       size="icon-sm"
                       className="h-8 w-auto px-3"
-                      disabled={isExtractingImage}
+                      disabled={isExtractingImage || isProcessingImage}
                       onClick={() => {
                         void extractImageFromUrl();
                       }}
@@ -720,9 +722,10 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                       variant="outline"
                       size="icon-sm"
                       className="h-8 w-auto px-3"
+                      disabled={isExtractingImage || isProcessingImage}
                       onClick={() => manualImageInputRef.current?.click()}
                     >
-                      Choose Image
+                      {isProcessingImage ? "Processing..." : "Choose Image"}
                     </Button>
                     <p className="text-xs text-muted-foreground">
                       {urlImageUnavailable
@@ -812,7 +815,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                 type="button"
                 size="icon-sm"
                 className="h-8 w-auto px-3"
-                disabled={isSaving}
+                disabled={isSaving || isExtractingImage || isProcessingImage}
                 onClick={saveItem}
               >
                 {isSaving

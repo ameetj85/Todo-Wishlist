@@ -1,7 +1,7 @@
 "use server";
 
 import { getAuthToken } from "@/lib/auth-cookie";
-import sharp from "sharp";
+import { compressImageForStorage, extractImageFromPage } from "@/lib/extract-image";
 
 type WishlistPayload = {
   title: string;
@@ -115,101 +115,23 @@ export async function deleteWishlistItemAction(itemId: number) {
 }
 
 export async function extractWishlistImageAction(url: string, title?: string) {
-  try {
-    const normalizedUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  const tokenResult = await getToken();
+  if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error, imageBase64: null };
 
-    const pageResponse = await fetch(normalizedUrl, {
-      cache: "no-store",
-      headers: {
-        Accept: "text/html,application/xhtml+xml",
-      },
-    });
-
-    if (!pageResponse.ok) {
-      return { ok: true as const, imageBase64: null };
-    }
-
-    const html = await pageResponse.text();
-    
-    // Find img tag where alt attribute contains a part of the title
-    let firstImageSource: string | null = null;
-    
-    if (title) {
-      const titleLower = title.toLowerCase();
-      const altMatches = html.matchAll(/<img[^>]+alt=["']([^"']*)["'][^>]+src=["']([^"']+)["']|<img[^>]+src=["']([^"']+)["'][^>]+alt=["']([^"']*)["']/gi);
-      
-      for (const match of altMatches) {
-        const altText = (match[1] || match[4] || "").toLowerCase();
-        const src = match[2] || match[3];
-        
-        if (altText.includes(titleLower)) {
-          firstImageSource = src;
-          break;
-        }
-      }
-    }
-    
-    // Fallback to first image if no title match or no title provided
-    if (!firstImageSource) {
-      const imageTagMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-      firstImageSource = imageTagMatch?.[1] ?? null;
-    }
-
-    if (!firstImageSource) {
-      return { ok: true as const, imageBase64: null };
-    }
-
-    const resolvedImageUrl = new URL(firstImageSource, pageResponse.url).toString();
-    const imageResponse = await fetch(resolvedImageUrl, {
-      cache: "no-store",
-      headers: {
-        Accept: "image/*",
-      },
-    });
-
-    if (!imageResponse.ok) {
-      return { ok: true as const, imageBase64: null };
-    }
-
-    const contentType = imageResponse.headers.get("content-type") ?? "";
-    if (!contentType.startsWith("image/")) {
-      return { ok: true as const, imageBase64: null };
-    }
-
-    const imageBuffer = Buffer.from(await imageResponse.arrayBuffer());
-    const optimizedBuffer = await optimizeImageBuffer(imageBuffer);
-    return { ok: true as const, imageBase64: optimizedBuffer.toString("base64") };
-  } catch {
-    return { ok: true as const, imageBase64: null };
-  }
+  const imageBase64 = await extractImageFromPage(url, title);
+  return { ok: true as const, imageBase64 };
 }
 
-const MAX_IMAGE_BYTES = 700 * 1024;
+export async function compressWishlistImageAction(imageBase64: string) {
+  const tokenResult = await getToken();
+  if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error, imageBase64: null };
 
-async function optimizeImageBuffer(inputBuffer: Buffer) {
-  let width = 800;
-  let quality = 82;
-  let attempts = 0;
-  let outputBuffer = inputBuffer;
-
-  // Iteratively reduce dimensions/quality until the payload is small enough.
-  while (attempts < 6) {
-    outputBuffer = await sharp(inputBuffer)
-      .rotate()
-      .resize({ width, withoutEnlargement: true })
-      .jpeg({ quality, mozjpeg: true })
-      .toBuffer();
-
-    if (outputBuffer.byteLength <= MAX_IMAGE_BYTES) {
-      return outputBuffer;
-    }
-
-    width = Math.max(240, Math.floor(width * 0.8));
-    quality = Math.max(45, quality - 8);
-    attempts += 1;
+  try {
+    const compressed = await compressImageForStorage(Buffer.from(imageBase64, "base64"));
+    return { ok: true as const, imageBase64: compressed.toString("base64") };
+  } catch {
+    return { ok: false as const, error: "Unsupported or corrupt image file", imageBase64: null };
   }
-
-  return outputBuffer;
 }
 
 export async function togglePublicWishlistPurchasedAction(payload: {

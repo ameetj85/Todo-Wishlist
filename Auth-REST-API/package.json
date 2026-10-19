@@ -19,6 +19,7 @@
     "db:reset": "prisma db push --force-reset",
     "db:seed": "node scripts/db-seed.js",
     "db:cleanup": "node scripts/db-cleanup.js",
+    "db:recompress-images": "node scripts/db-recompress-images.js",
     "prisma:generate": "prisma generate",
     "check:env": "node scripts/check-env.js"
   },
@@ -46,6 +47,7 @@
   },
   "devDependencies": {
     "eslint": "^10.1.0",
-    "prisma": "^7.6.0"
+    "prisma": "^7.6.0",
+    "sharp": "^0.34.5"
   }
 }
