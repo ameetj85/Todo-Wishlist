@@ -601,7 +601,7 @@ npm test
 npm run test:coverage
 ```
 
-The test scripts set `DATABASE_URL` inline, which needs a POSIX shell (Git Bash on Windows).
+The test scripts work in any shell (cmd, PowerShell, Git Bash): `cross-env` sets the test database URL.
 
 Tests run against an **in-memory SQLite database** — your dev DB is untouched.
 
