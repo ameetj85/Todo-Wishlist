@@ -29,6 +29,20 @@ const EXTRACTION_ATTEMPTS = 3;
 const EXTRACTION_RETRY_DELAY_MS = 1_500;
 const EXTRACTION_DEADLINE_MS = 30_000;
 
+// Sites that block datacenter IPs (e.g. Walmart) are re-fetched through ScraperAPI when
+// SCRAPER_API_KEY is set. Proxied requests are slow and cost credits, so allow few of them.
+const SCRAPER_API_ENDPOINT = "https://api.scraperapi.com/";
+const SCRAPER_API_TIMEOUT_MS = 60_000;
+const SCRAPER_API_MAX_ATTEMPTS = 2;
+const SCRAPER_API_DEADLINE_MS = 90_000;
+
+// Bot-check / captcha interstitials served instead of the product page.
+const BLOCK_PAGE_TITLE_PATTERN =
+  /^\s*(?:robot or human|robot check|are you a (?:robot|human)|access denied|just a moment|attention required|pardon our interruption|security check|verify you are (?:a )?human|captcha)/i;
+const BLOCK_PAGE_MARKER_PATTERN = /px-captcha|\/errors\/validateCaptcha|captcha-delivery\.com|cf-chl-|challenges\.cloudflare\.com/i;
+// Real product pages are large; only small pages are checked for challenge markers.
+const BLOCK_PAGE_MAX_BYTES = 100_000;
+
 // Stored images are shown at most ~330 CSS px (grid view) and 80 px (list view), so 640 px
 // keeps them crisp on 2x displays. WebP is roughly 30% smaller than JPEG at the same quality.
 const OUTPUT_MAX_DIMENSION = 640;
@@ -87,7 +101,7 @@ async function assertPublicUrl(url: URL) {
 }
 
 // Follows redirects manually so every hop goes through the SSRF check.
-async function safeFetch(rawUrl: string, accept: string, referer?: string) {
+async function safeFetch(rawUrl: string, accept: string, referer?: string, timeoutMs = FETCH_TIMEOUT_MS) {
   let url = new URL(rawUrl);
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
@@ -96,7 +110,7 @@ async function safeFetch(rawUrl: string, accept: string, referer?: string) {
     const response = await fetch(url, {
       cache: "no-store",
       redirect: "manual",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
       headers: { ...BROWSER_HEADERS, Accept: accept, ...(referer ? { Referer: referer } : {}) },
     });
 
@@ -523,18 +537,52 @@ export type ExtractedItemInfo = {
   title: string | null;
   price: number | null;
   imageBase64: string | null;
+  /** The site only ever returned a bot-check page, so nothing could be read. */
+  blocked: boolean;
 };
+
+type PageFetchResult = { html: string; finalUrl: string } | "blocked" | null;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchPageHtml(url: string) {
+function isBlockPage(status: number, html: string) {
+  if (status === 403 || status === 429 || status === 503) return true;
+
+  const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
+  if (BLOCK_PAGE_TITLE_PATTERN.test(decodeHtmlEntities(title))) return true;
+
+  return html.length < BLOCK_PAGE_MAX_BYTES && BLOCK_PAGE_MARKER_PATTERN.test(html);
+}
+
+async function fetchPageHtml(url: string): Promise<PageFetchResult> {
   const { response, finalUrl } = await safeFetch(url, HTML_ACCEPT);
-  if (!response.ok) return null;
 
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType && !/html|xml|text\/plain/i.test(contentType)) return null;
 
-  return { html: await response.text(), finalUrl: finalUrl.toString() };
+  const html = await response.text();
+  if (isBlockPage(response.status, html)) return "blocked";
+
+  return response.ok ? { html, finalUrl: finalUrl.toString() } : null;
+}
+
+// ScraperAPI fetches the page from residential IPs and returns its HTML as the response body.
+async function fetchPageViaScraperApi(url: string, apiKey: string, timeoutMs: number): Promise<PageFetchResult> {
+  const endpoint = new URL(SCRAPER_API_ENDPOINT);
+  endpoint.searchParams.set("api_key", apiKey);
+  endpoint.searchParams.set("url", url);
+
+  const { response } = await safeFetch(endpoint.toString(), HTML_ACCEPT, undefined, timeoutMs);
+
+  // 401: bad key, 403: credits used up. Neither will fix itself, so make it visible in the server logs.
+  if (response.status === 401 || response.status === 403) {
+    console.warn(`ScraperAPI rejected the request (HTTP ${response.status}); check SCRAPER_API_KEY and the account's remaining credits`);
+    return null;
+  }
+  if (!response.ok) return null;
+
+  const html = await response.text();
+  return isBlockPage(response.status, html) ? "blocked" : { html, finalUrl: url };
 }
 
 /**
@@ -545,10 +593,18 @@ async function fetchPageHtml(url: string) {
  * pages. Extraction therefore runs up to EXTRACTION_ATTEMPTS passes: each pass re-fetches
  * the page, fills in whatever is still missing, and tries the next batch of image candidates
  * it hasn't tried yet, backing off a little longer between passes.
+ *
+ * If the site answers with a bot-check page, retrying directly won't help: the page is
+ * fetched through ScraperAPI instead when SCRAPER_API_KEY is set, otherwise extraction
+ * stops and reports the item as blocked.
  */
 export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string): Promise<ExtractedItemInfo> {
-  const result: ExtractedItemInfo = { title: null, price: null, imageBase64: null };
-  const deadline = Date.now() + EXTRACTION_DEADLINE_MS;
+  const result: ExtractedItemInfo = { title: null, price: null, imageBase64: null, blocked: false };
+  const scraperApiKey = process.env.SCRAPER_API_KEY?.trim();
+  let deadline = Date.now() + EXTRACTION_DEADLINE_MS;
+  let useScraperApi = false;
+  let scraperApiAttempts = 0;
+  let gotPage = false;
   const triedImages = new Set<string>();
 
   let normalizedUrl: string;
@@ -567,9 +623,24 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
   for (let attempt = 1; attempt <= EXTRACTION_ATTEMPTS && Date.now() < deadline; attempt += 1) {
     if (attempt > 1) await wait(EXTRACTION_RETRY_DELAY_MS * (attempt - 1));
 
-    const page = await fetchPageHtml(normalizedUrl).catch(() => null);
+    let page = useScraperApi ? null : await fetchPageHtml(normalizedUrl).catch(() => null);
 
-    if (!page) continue;
+    if (page === "blocked") {
+      result.blocked = true;
+      if (!scraperApiKey) break;
+      useScraperApi = true;
+      deadline = Math.max(deadline, Date.now() + SCRAPER_API_DEADLINE_MS);
+    }
+
+    if (useScraperApi && scraperApiKey) {
+      if (scraperApiAttempts >= SCRAPER_API_MAX_ATTEMPTS) break;
+      scraperApiAttempts += 1;
+      const timeoutMs = Math.min(SCRAPER_API_TIMEOUT_MS, deadline - Date.now());
+      page = await fetchPageViaScraperApi(normalizedUrl, scraperApiKey, timeoutMs).catch(() => null);
+    }
+
+    if (!page || page === "blocked") continue;
+    gotPage = true;
 
     try {
       const details = findProductDetails(page.html, page.finalUrl);
@@ -603,6 +674,7 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
     if (result.title && result.imageBase64) break;
   }
 
+  result.blocked &&= !gotPage;
   return result;
 }
 

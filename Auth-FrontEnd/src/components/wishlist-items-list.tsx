@@ -63,6 +63,15 @@ function normalizeItemUrl(url: string | null) {
   return `https://${url}`;
 }
 
+// "https://www.walmart.com/ip/..." -> "walmart.com"
+function getSiteName(url: string) {
+  try {
+    return new URL(normalizeItemUrl(url)!).hostname.replace(/^www\d*\./i, "");
+  } catch {
+    return "That site";
+  }
+}
+
 function getPriorityChipClasses(priority: number) {
   if (priority === 0) return "bg-red-100 text-red-700 border-red-200";
   if (priority === 1) return "bg-amber-100 text-amber-800 border-amber-200";
@@ -281,7 +290,9 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
 
       const missing = [!title && "name", price === null && "price", !imageBase64 && "image"].filter(Boolean);
       setExtractionNotice(
-        missing.length === 0
+        payload.blocked
+          ? { tone: "warning", message: `${getSiteName(url)} blocked the automatic lookup. Please enter the item details manually.` }
+          : missing.length === 0
           ? { tone: "success", message: "Filled in the name, price and image from the page." }
           : missing.length === 3
             ? { tone: "warning", message: "Couldn't find item details on that page. Please enter them manually." }
