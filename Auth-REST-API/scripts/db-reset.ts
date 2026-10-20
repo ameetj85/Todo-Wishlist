@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-'use strict';
 // npm run db:reset
 // Drops all tables and re-initializes the schema. ALL DATA WILL BE LOST.
 
-require('dotenv').config();
-const readline = require('readline');
-const path = require('path');
-const fs   = require('fs');
-const { getDatabaseUrl } = require('../src/db/prisma');
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+import readline from 'readline';
+import path from 'path';
+import fs from 'fs';
+import { getDatabaseUrl } from '../src/db/prisma';
 
 function resolveDbPathFromUrl() {
   const url = getDatabaseUrl();

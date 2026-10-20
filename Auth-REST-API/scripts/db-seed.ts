@@ -1,14 +1,16 @@
 #!/usr/bin/env node
-'use strict';
 // npm run db:seed
 // Inserts sample users for development/testing.
 
-require('dotenv').config();
-const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
-const { prisma } = require('../src/db/prisma');
-const { toSqliteDateOnly } = require('../src/utils/dates');
-const config = require('../src/config');
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '../src/db/prisma';
+import { toSqliteDateOnly } from '../src/utils/dates';
+import config from '../src/config';
 
 const SEED_USERS = [
   { email: 'admin@example.com', name: 'Admin User', password: 'AdminPass1' },
@@ -73,7 +75,7 @@ const WISHLIST_URLS = [
   null,
 ];
 
-function pickRandom(items) {
+function pickRandom<T>(items: readonly T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
 

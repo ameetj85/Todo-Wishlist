@@ -1,12 +1,8 @@
-'use strict';
-
-function toSqliteDate(ms) {
+export function toSqliteDate(ms: number): string {
   return new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
 }
 
-function toSqliteDateOnly(value) {
+export function toSqliteDateOnly(value: Date | number | string): string {
   const date = value instanceof Date ? value : new Date(value);
   return date.toISOString().slice(0, 10);
 }
-
-module.exports = { toSqliteDate, toSqliteDateOnly };

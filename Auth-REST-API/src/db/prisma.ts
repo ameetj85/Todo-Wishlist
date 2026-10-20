@@ -1,11 +1,9 @@
-'use strict';
+import fs from 'fs';
+import path from 'path';
+import { PrismaClient } from '@prisma/client';
+import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 
-const fs = require('fs');
-const path = require('path');
-const { PrismaClient } = require('@prisma/client');
-const { PrismaBetterSqlite3 } = require('@prisma/adapter-better-sqlite3');
-
-function normalizeSqliteFileUrl(rawUrl) {
+function normalizeSqliteFileUrl(rawUrl: string): string {
   if (!rawUrl || !rawUrl.startsWith('file:')) {
     return rawUrl;
   }
@@ -32,7 +30,7 @@ function normalizeSqliteFileUrl(rawUrl) {
   return `file:${absoluteDbPath}${queryPart}`;
 }
 
-function sqliteFilePathFromUrl(url) {
+function sqliteFilePathFromUrl(url: string): string | null {
   if (!url || !url.startsWith('file:')) {
     return null;
   }
@@ -46,7 +44,7 @@ function sqliteFilePathFromUrl(url) {
   return queryIndex === -1 ? sqlitePath : sqlitePath.slice(0, queryIndex);
 }
 
-function isExistingNonEmptyFile(filePath) {
+function isExistingNonEmptyFile(filePath: string): boolean {
   try {
     const stat = fs.statSync(filePath);
     return stat.isFile() && stat.size > 0;
@@ -55,7 +53,7 @@ function isExistingNonEmptyFile(filePath) {
   }
 }
 
-function resolveDatabaseUrl() {
+function resolveDatabaseUrl(): string {
   const fallbackDbPath = process.env.DB_PATH || './data/auth.db';
   const fallbackUrl = normalizeSqliteFileUrl(
     fallbackDbPath.startsWith('file:') ? fallbackDbPath : `file:${fallbackDbPath}`,
@@ -88,21 +86,21 @@ function resolveDatabaseUrl() {
   return normalizeSqliteFileUrl(dbPath.startsWith('file:') ? dbPath : `file:${dbPath}`);
 }
 
-function getDatabaseUrl() {
+export function getDatabaseUrl(): string {
   const url = resolveDatabaseUrl();
   process.env.DATABASE_URL = url;
   return url;
 }
 
-getDatabaseUrl();
+const databaseUrl = getDatabaseUrl();
 
 const adapter = new PrismaBetterSqlite3({
-  url: process.env.DATABASE_URL,
+  url: databaseUrl,
 });
 
-const globalForPrisma = globalThis;
+const globalForPrisma = globalThis as typeof globalThis & { __prisma?: PrismaClient };
 
-const prisma =
+export const prisma =
   globalForPrisma.__prisma ||
   new PrismaClient({
     adapter,
@@ -112,5 +110,3 @@ const prisma =
 if (process.env.NODE_ENV !== 'production') {
   globalForPrisma.__prisma = prisma;
 }
-
-module.exports = { prisma, getDatabaseUrl };

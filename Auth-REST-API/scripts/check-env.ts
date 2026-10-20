@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-'use strict';
 // npm run check:env
 // Validates all required environment variables before starting the server.
 
-require('dotenv').config();
+import dotenv from 'dotenv';
+
+dotenv.config();
+
 
 const REQUIRED = [
   { key: 'JWT_SECRET',   hint: 'A long random secret string' },

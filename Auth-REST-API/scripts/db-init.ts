@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-'use strict';
 // npm run db:init
 // Initializes the database schema via Prisma.
 
-require('dotenv').config();
-const { prisma, getDatabaseUrl } = require('../src/db/prisma');
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+import { prisma, getDatabaseUrl } from '../src/db/prisma';
 
 async function main() {
-	const tableRows = await prisma.$queryRawUnsafe(
+	const tableRows = await prisma.$queryRawUnsafe<{ name: string }[]>(
 		'SELECT name FROM sqlite_master WHERE type=\'table\' ORDER BY name',
 	);
 	console.log('✅ Database initialized successfully.');

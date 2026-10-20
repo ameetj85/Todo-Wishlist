@@ -1,31 +1,30 @@
-'use strict';
-
-const crypto = require('crypto');
-const express = require('express');
-const { prisma } = require('../db/prisma');
-const { requireAuth } = require('../middleware/auth');
-const { toSqliteDateOnly } = require('../utils/dates');
-const config = require('../config');
+import crypto from 'crypto';
+import express, { type Response } from 'express';
+import type { Prisma, WishlistItem } from '@prisma/client';
+import { prisma } from '../db/prisma';
+import { requireAuth } from '../middleware/auth';
+import { toSqliteDateOnly } from '../utils/dates';
+import config from '../config';
 
 const router = express.Router();
 
 // Share tokens are stateless: base64url(userId) + "." + random nonce + "." + HMAC
 // signature. The nonce makes every generated link unique.
-function signShareTokenPart(payload, nonce) {
+function signShareTokenPart(payload: string, nonce: string): Buffer {
   return crypto
     .createHmac('sha256', config.shareLink.secret)
     .update(`${payload}.${nonce}`)
     .digest();
 }
 
-function signShareToken(userId) {
+function signShareToken(userId: string): string {
   const payload = Buffer.from(userId, 'utf8').toString('base64url');
   const nonce = crypto.randomBytes(9).toString('base64url');
   const signature = signShareTokenPart(payload, nonce).toString('base64url');
   return `${payload}.${nonce}.${signature}`;
 }
 
-function verifyShareToken(token) {
+function verifyShareToken(token: string): string | null {
   const [payload, nonce, signature, extra] = String(token).split('.');
   if (!payload || !nonce || !signature || extra !== undefined) return null;
 
@@ -42,23 +41,30 @@ function verifyShareToken(token) {
   return Buffer.from(payload, 'base64url').toString('utf8');
 }
 
-function isValidEmail(value) {
+function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-function parseItemId(value) {
-  const itemId = Number.parseInt(value, 10);
+function parseItemId(value: unknown): number | null {
+  // parseInt coerces non-strings the same way the JS version did.
+  const itemId = Number.parseInt(value as string, 10);
   return Number.isInteger(itemId) && itemId > 0 ? itemId : null;
 }
 
-function parseInteger(value, fieldName, { min = null } = {}) {
+function parseInteger(
+  value: unknown,
+  fieldName: string,
+  { min = null }: { min?: number | null } = {},
+): string | null {
   if (!Number.isInteger(value)) return `${fieldName} must be an integer`;
-  if (min !== null && value < min)
+  if (min !== null && (value as number) < min)
     return `${fieldName} must be greater than or equal to ${min}`;
   return null;
 }
 
-function parsePrice(value) {
+type Parsed<T> = { error: string; value?: undefined } | { error?: undefined; value: T };
+
+function parsePrice(value: unknown): Parsed<number> {
   if (value === undefined) {
     return { value: 0 };
   }
@@ -74,7 +80,11 @@ function parsePrice(value) {
   return { value };
 }
 
-function parseOptionalImageBlob(itemImage) {
+type ParsedImage =
+  | { error: string; blob?: undefined }
+  | { error?: undefined; blob: Buffer<ArrayBuffer> | null | undefined };
+
+function parseOptionalImageBlob(itemImage: unknown): ParsedImage {
   if (itemImage === undefined || itemImage === null) return { blob: itemImage };
   if (typeof itemImage !== 'string') {
     return { error: 'item_image must be a base64 string' };
@@ -87,7 +97,7 @@ function parseOptionalImageBlob(itemImage) {
   }
 }
 
-function toWishlistResponse(row) {
+function toWishlistResponse(row: WishlistItem) {
   return {
     item_id: row.itemId,
     userid: row.userId,
@@ -104,7 +114,11 @@ function toWishlistResponse(row) {
   };
 }
 
-async function resolveSequenceForCreate(transaction, userId, requestedSequence) {
+async function resolveSequenceForCreate(
+  transaction: Prisma.TransactionClient,
+  userId: string,
+  requestedSequence: number | undefined,
+): Promise<number> {
   if (requestedSequence !== undefined) {
     return requestedSequence;
   }
@@ -121,7 +135,12 @@ async function resolveSequenceForCreate(transaction, userId, requestedSequence) 
   return 0;
 }
 
-async function setPublicItemPurchased(res, user, itemId, purchased) {
+async function setPublicItemPurchased(
+  res: Response,
+  user: { id: string } | null,
+  itemId: number,
+  purchased: boolean,
+) {
   if (!user) {
     return res.status(404).json({ error: 'Wishlist owner not found' });
   }
@@ -139,7 +158,8 @@ async function setPublicItemPurchased(res, user, itemId, purchased) {
     where: { itemId, userId: user.id },
   });
 
-  return res.json({ item: toWishlistResponse(item) });
+  // The row was just updated under the same filter, so it exists.
+  return res.json({ item: toWishlistResponse(item!) });
 }
 
 router.get('/public/by-email', async (req, res) => {
@@ -262,14 +282,18 @@ const MAX_IMPORT_RECORDS = 5000;
 const IMPORT_MODES = ['append', 'replace'];
 const BASE64_PATTERN = /^[A-Za-z0-9+/]*={0,2}$/;
 
+type ParsedImport =
+  | { error: string; data?: undefined }
+  | { error?: undefined; data: Omit<Prisma.WishlistItemCreateManyInput, 'sequence'> };
+
 // Validates one exported wishlist item and maps it to Prisma data (ids are ignored).
-function parseImportedWishlistItem(raw, userId) {
+function parseImportedWishlistItem(raw: unknown, userId: string): ParsedImport {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { error: 'must be an object' };
   }
 
   const { title, description, url, item_image, price, priority, quantity, purchased } =
-    raw;
+    raw as Record<string, unknown>;
 
   if (typeof title !== 'string' || !title.trim()) {
     return { error: 'title is required' };
@@ -288,8 +312,8 @@ function parseImportedWishlistItem(raw, userId) {
     return { error: 'item_image must be a base64 string or null' };
   }
   const parsedPrice = parsePrice(price);
-  if (parsedPrice.error) return { error: parsedPrice.error };
-  if (priority !== undefined && ![0, 1, 2].includes(priority)) {
+  if (parsedPrice.error !== undefined) return { error: parsedPrice.error };
+  if (priority !== undefined && ![0, 1, 2].includes(priority as number)) {
     return { error: 'priority must be one of 0, 1, or 2' };
   }
   if (quantity !== undefined) {
@@ -304,12 +328,12 @@ function parseImportedWishlistItem(raw, userId) {
     data: {
       userId,
       title: title.trim(),
-      description: description ?? null,
-      url: url ?? null,
-      itemImage: item_image ? Buffer.from(item_image, 'base64') : null,
+      description: (description as string | null | undefined) ?? null,
+      url: (url as string | null | undefined) ?? null,
+      itemImage: item_image ? Buffer.from(item_image as string, 'base64') : null,
       price: parsedPrice.value,
-      priority: priority ?? 1,
-      quantity: quantity ?? 1,
+      priority: (priority as number | undefined) ?? 1,
+      quantity: (quantity as number | undefined) ?? 1,
       purchased: !!purchased,
       createdDate: toSqliteDateOnly(Date.now()),
     },
@@ -331,10 +355,10 @@ router.post('/import', async (req, res) => {
       .json({ error: `Cannot import more than ${MAX_IMPORT_RECORDS} items at once` });
   }
 
-  const rows = [];
+  const rows: Omit<Prisma.WishlistItemCreateManyInput, 'sequence'>[] = [];
   for (const [index, raw] of items.entries()) {
     const parsed = parseImportedWishlistItem(raw, req.user.id);
-    if (parsed.error) {
+    if (parsed.error !== undefined) {
       return res.status(400).json({ error: `items[${index}]: ${parsed.error}` });
     }
     rows.push(parsed.data);
@@ -410,10 +434,10 @@ router.post('/', async (req, res) => {
   }
 
   const image = parseOptionalImageBlob(item_image);
-  if (image.error) return res.status(400).json({ error: image.error });
+  if (image.error !== undefined) return res.status(400).json({ error: image.error });
 
   const parsedPrice = parsePrice(price);
-  if (parsedPrice.error) {
+  if (parsedPrice.error !== undefined) {
     return res.status(400).json({ error: parsedPrice.error });
   }
 
@@ -480,7 +504,7 @@ router.put('/:itemId', async (req, res) => {
     sequence,
   } = req.body;
 
-  const data = {};
+  const data: Prisma.WishlistItemUpdateManyMutationInput = {};
 
   if (title !== undefined) {
     if (typeof title !== 'string' || !title.trim()) {
@@ -509,13 +533,13 @@ router.put('/:itemId', async (req, res) => {
 
   if (item_image !== undefined) {
     const image = parseOptionalImageBlob(item_image);
-    if (image.error) return res.status(400).json({ error: image.error });
+    if (image.error !== undefined) return res.status(400).json({ error: image.error });
     data.itemImage = image.blob;
   }
 
   if (price !== undefined) {
     const parsedPrice = parsePrice(price);
-    if (parsedPrice.error) {
+    if (parsedPrice.error !== undefined) {
       return res.status(400).json({ error: parsedPrice.error });
     }
     data.price = parsedPrice.value;
@@ -568,7 +592,8 @@ router.put('/:itemId', async (req, res) => {
     where: { itemId, userId: req.user.id },
   });
 
-  return res.json({ item: toWishlistResponse(item) });
+  // The row was just updated under the same filter, so it exists.
+  return res.json({ item: toWishlistResponse(item!) });
 });
 
 router.delete('/:itemId', async (req, res) => {
@@ -586,4 +611,4 @@ router.delete('/:itemId', async (req, res) => {
   return res.json({ message: 'Wishlist item deleted successfully' });
 });
 
-module.exports = router;
+export default router;

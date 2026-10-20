@@ -1,8 +1,8 @@
-'use strict';
+import dotenv from 'dotenv';
 
-require('dotenv').config();
+dotenv.config();
 
-function resolveDatabaseUrl() {
+function resolveDatabaseUrl(): string {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
 
   const dbPath = process.env.DB_PATH || './data/auth.db';
@@ -65,4 +65,4 @@ const config = {
   },
 };
 
-module.exports = config;
+export default config;

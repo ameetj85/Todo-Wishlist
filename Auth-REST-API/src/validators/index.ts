@@ -1,12 +1,12 @@
-'use strict';
+// Inputs come straight from request bodies, so they are typed as unknown.
 
-function validateEmail(email) {
+export function validateEmail(email: unknown): string | null {
   if (!email || typeof email !== 'string') return 'Email is required';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return 'Invalid email address';
   return null;
 }
 
-function validatePassword(password) {
+export function validatePassword(password: unknown): string | null {
   if (!password || typeof password !== 'string') return 'Password is required';
   if (password.length < 8)     return 'Password must be at least 8 characters';
   if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
@@ -14,14 +14,22 @@ function validatePassword(password) {
   return null;
 }
 
-function validateName(name) {
+export function validateName(name: unknown): string | null {
   if (!name || typeof name !== 'string') return 'Name is required';
   if (name.trim().length < 2) return 'Name must be at least 2 characters';
   if (name.trim().length > 100) return 'Name must be 100 characters or fewer';
   return null;
 }
 
-function validateSignup({ email, password, name }) {
+export function validateSignup({
+  email,
+  password,
+  name,
+}: {
+  email: unknown;
+  password: unknown;
+  name: unknown;
+}): string | null {
   return (
     validateEmail(email) ||
     validatePassword(password) ||
@@ -30,10 +38,14 @@ function validateSignup({ email, password, name }) {
   );
 }
 
-function validateLogin({ email, password }) {
+export function validateLogin({
+  email,
+  password,
+}: {
+  email: unknown;
+  password: unknown;
+}): string | null {
   if (!email) return 'email is required';
   if (!password) return 'password is required';
   return null;
 }
-
-module.exports = { validateEmail, validatePassword, validateName, validateSignup, validateLogin };

@@ -1,6 +1,8 @@
 # Auth API
 
-A production-ready REST API authentication system built with **Node.js**, **Express**, **Prisma**, and **SQLite**. No external auth services required — sessions are stored on disk.
+A production-ready REST API authentication system built with **Node.js**, **TypeScript**, **Express**, **Prisma**, and **SQLite**. No external auth services required — sessions are stored on disk.
+
+The source is TypeScript and is compiled to `dist/` with `npm run build`. `npm install` / `npm ci` build automatically (postinstall), so the usual deploy steps produce a fresh `dist/`.
 
 ## Features
 
@@ -19,7 +21,7 @@ A production-ready REST API authentication system built with **Node.js**, **Expr
 ## Quick Start
 
 ```bash
-# 1. Install dependencies
+# 1. Install dependencies (also generates the Prisma client and builds dist/)
 npm install
 
 # 2. Configure environment
@@ -30,9 +32,11 @@ cp .env.example .env
 npm run check:env
 
 # 4. Start
-npm start          # production
-npm run dev        # development (auto-restart on file changes)
+npm start          # production (runs dist/server.js)
+npm run dev        # development (runs the TypeScript directly, restarts on file changes)
 ```
+
+`node server.js` still works: the root `server.js` is a small launcher for `dist/server.js`, so a process manager pointed at it keeps working after a build.
 
 ---
 
@@ -40,11 +44,13 @@ npm run dev        # development (auto-restart on file changes)
 
 | Script                  | Description                            |
 | ----------------------- | -------------------------------------- |
-| `npm start`             | Start the server                       |
-| `npm run dev`           | Start with `--watch` (auto-restart)    |
-| `npm test`              | Run all tests                          |
+| `npm run build`         | Compile TypeScript to `dist/`          |
+| `npm run typecheck`     | Type-check without writing `dist/`     |
+| `npm start`             | Start the compiled server              |
+| `npm run dev`           | Start with `tsx watch` (auto-restart)  |
+| `npm test`              | Build, then run all tests              |
 | `npm run test:watch`    | Run tests in watch mode                |
-| `npm run test:coverage` | Run tests with coverage report         |
+| `npm run test:coverage` | Build, then run tests with coverage    |
 | `npm run lint`          | Lint with ESLint                       |
 | `npm run lint:fix`      | Auto-fix lint issues                   |
 | `npm run db:init`       | Initialize database schema             |
@@ -60,40 +66,51 @@ npm run dev        # development (auto-restart on file changes)
 
 ```
 auth-api/
-├── server.js                    # Entry point
+├── server.ts                    # Entry point (compiled to dist/server.js)
+├── server.js                    # Launcher for dist/server.js
 ├── package.json
+├── tsconfig.json
+├── eslint.config.cjs
 ├── .env.example                 # All supported env vars with comments
-├── .eslintrc.json
 │
 ├── src/
 │   ├── config/
-│   │   └── index.js             # Central config (reads from env)
+│   │   └── index.ts             # Central config (reads from env)
 │   ├── db/
-│   │   └── prisma.js            # Prisma client + DB URL resolution
+│   │   └── prisma.ts            # Prisma client + DB URL resolution
 │   ├── middleware/
-│   │   └── auth.js              # requireAuth middleware
+│   │   └── auth.ts              # requireAuth middleware
 │   ├── routes/
-│   │   └── auth.js              # All 8 auth endpoints
+│   │   ├── auth.ts              # Auth endpoints
+│   │   ├── admin.ts             # Admin console endpoints
+│   │   ├── todo.ts              # Todo endpoints
+│   │   └── wishlist.ts          # Wishlist endpoints (incl. public/shared)
+│   ├── types/
+│   │   └── express.d.ts         # req.user / req.sessionId / req.token
 │   ├── utils/
-│   │   └── email.js             # Nodemailer password reset emails
-│   └── validators/
-│       └── index.js             # Input validation functions
+│   │   ├── dates.ts             # SQLite date string helpers
+│   │   └── email.ts             # Nodemailer reset/verification emails
+│   ├── validators/
+│   │   └── index.ts             # Input validation functions
+│   └── tests/                   # node:test suites (JavaScript, run against dist/)
+│       ├── helpers.js           # Shared DB helpers for tests
+│       ├── auth.test.js         # Auth endpoints
+│       ├── admin.test.js        # Admin endpoints
+│       ├── todo.test.js         # Todo endpoints
+│       ├── wishlist.test.js     # Wishlist endpoints
+│       ├── frontend-contract.test.js  # Response shapes Auth-FrontEnd relies on
+│       ├── validators.test.js   # Unit tests — validators
+│       └── database.test.js     # Unit tests — DB schema
 ├── prisma/
 │   └── schema.prisma            # Prisma schema
 │
-├── scripts/
-│   ├── db-init.js               # npm run db:init
-│   ├── db-reset.js              # npm run db:reset
-│   ├── db-seed.js               # npm run db:seed
-│   ├── db-cleanup.js            # npm run db:cleanup
-│   ├── db-recompress-images.js  # npm run db:recompress-images
-│   └── check-env.js             # npm run check:env
-│
-└── tests/
-    ├── helpers.js               # Shared DB helpers for tests
-    ├── validators.test.js       # Unit tests — validators
-    ├── database.test.js         # Unit tests — DB schema
-    └── auth.test.js             # Integration tests — all endpoints
+└── scripts/
+    ├── db-init.ts               # node dist/scripts/db-init.js
+    ├── db-reset.ts              # node dist/scripts/db-reset.js
+    ├── db-seed.ts               # npm run db:seed
+    ├── db-cleanup.ts            # npm run db:cleanup
+    ├── db-recompress-images.ts  # npm run db:recompress-images
+    └── check-env.ts             # npm run check:env
 ```
 
 ---
@@ -577,12 +594,14 @@ See `.env.example` for all variables. Key ones:
 
 ## Running Tests
 
-Tests use **Node.js's built-in test runner** (no extra dependencies needed, requires Node 18+).
+Tests use **Node.js's built-in test runner**. They are plain JavaScript and run against the compiled API in `dist/`, so `npm test` builds first.
 
 ```bash
 npm test
 npm run test:coverage
 ```
+
+The test scripts work in any shell (cmd, PowerShell, Git Bash): `cross-env` sets the test database URL.
 
 Tests run against an **in-memory SQLite database** — your dev DB is untouched.
 
@@ -593,5 +612,5 @@ Tests run against an **in-memory SQLite database** — your dev DB is untouched.
 - Set `NODE_ENV=production` — this suppresses stack traces in error responses
 - Set `BCRYPT_ROUNDS=12` or higher
 - Change `JWT_SECRET` to a long, random string
-- Run `npm run db:cleanup` on a cron to purge expired sessions
+- Run `npm run db:cleanup` (or `node dist/scripts/db-cleanup.js`) on a cron to purge expired sessions
 - Put behind nginx with TLS

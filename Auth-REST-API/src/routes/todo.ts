@@ -1,15 +1,14 @@
-'use strict';
-
-const express = require('express');
-const { prisma } = require('../db/prisma');
-const { requireAuth } = require('../middleware/auth');
-const { toSqliteDateOnly } = require('../utils/dates');
+import express from 'express';
+import type { Prisma, Todo } from '@prisma/client';
+import { prisma } from '../db/prisma';
+import { requireAuth } from '../middleware/auth';
+import { toSqliteDateOnly } from '../utils/dates';
 
 const router = express.Router();
 
 router.use(requireAuth);
 
-function toTodoResponse(row) {
+function toTodoResponse(row: Todo) {
   return {
     todo_id: row.todoId,
     user_id: row.userId,
@@ -25,32 +24,37 @@ function toTodoResponse(row) {
   };
 }
 
-function parseTodoId(value) {
-  const todoId = Number.parseInt(value, 10);
+function parseTodoId(value: unknown): number | null {
+  // parseInt coerces non-strings the same way the JS version did.
+  const todoId = Number.parseInt(value as string, 10);
   return Number.isInteger(todoId) && todoId > 0 ? todoId : null;
 }
 
-function isValidDate(value) {
+function isValidDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function isValidDateTime(value) {
+function isValidDateTime(value: string): boolean {
   return !Number.isNaN(Date.parse(value));
 }
 
 const MAX_IMPORT_RECORDS = 5000;
 const IMPORT_MODES = ['append', 'replace'];
 
-function isNonEmptyString(value) {
+function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function isOptionalBoolean(value) {
+function isOptionalBoolean(value: unknown): boolean {
   return value === undefined || typeof value === 'boolean';
 }
 
+type ParsedImport =
+  | { error: string; data?: undefined }
+  | { error?: undefined; data: Prisma.TodoCreateManyInput };
+
 // Validates one exported todo and maps it to Prisma data (ids are ignored).
-function parseImportedTodo(raw, userId) {
+function parseImportedTodo(raw: unknown, userId: string): ParsedImport {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     return { error: 'must be an object' };
   }
@@ -65,7 +69,7 @@ function parseImportedTodo(raw, userId) {
     reminder_date,
     reminder_sent,
     created_date,
-  } = raw;
+  } = raw as Record<string, unknown>;
 
   if (!isNonEmptyString(name)) return { error: 'name is required' };
   if (!isNonEmptyString(description)) return { error: 'description is required' };
@@ -99,10 +103,10 @@ function parseImportedTodo(raw, userId) {
       name: name.trim(),
       description: description.trim(),
       category: category.trim(),
-      dueDate: due_date ?? null,
+      dueDate: (due_date as string | null | undefined) ?? null,
       completed: !!completed,
       remindMe: !!remind_me,
-      reminderDate: reminder_date ?? null,
+      reminderDate: (reminder_date as string | null | undefined) ?? null,
       reminderSent: !!reminder_sent,
       createdDate:
         typeof created_date === 'string' && isValidDate(created_date)
@@ -127,10 +131,10 @@ router.post('/import', async (req, res) => {
       .json({ error: `Cannot import more than ${MAX_IMPORT_RECORDS} todos at once` });
   }
 
-  const rows = [];
+  const rows: Prisma.TodoCreateManyInput[] = [];
   for (const [index, raw] of todos.entries()) {
     const parsed = parseImportedTodo(raw, req.user.id);
-    if (parsed.error) {
+    if (parsed.error !== undefined) {
       return res.status(400).json({ error: `todos[${index}]: ${parsed.error}` });
     }
     rows.push(parsed.data);
@@ -224,7 +228,7 @@ router.get('/', async (req, res) => {
   const dueTodayOrOverdueOpenOnly =
     req.query.due_today_open === '1' || req.query.due_today_open === 'true';
 
-  const where = { userId: req.user.id };
+  const where: Prisma.TodoWhereInput = { userId: req.user.id };
 
   if (dueTodayOrOverdueOpenOnly) {
     where.dueDate = {
@@ -268,7 +272,7 @@ router.put('/', async (req, res) => {
     reminder_date,
     reminder_sent,
   } = req.body;
-  const data = {};
+  const data: Prisma.TodoUpdateManyMutationInput = {};
 
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim())
@@ -372,7 +376,8 @@ router.put('/', async (req, res) => {
     where: { todoId, userId: req.user.id },
   });
 
-  return res.json({ todo: toTodoResponse(todo) });
+  // The row was just updated under the same filter, so it exists.
+  return res.json({ todo: toTodoResponse(todo!) });
 });
 
 router.delete('/:todoId', async (req, res) => {
@@ -388,4 +393,4 @@ router.delete('/:todoId', async (req, res) => {
   return res.json({ message: 'Todo deleted successfully' });
 });
 
-module.exports = router;
+export default router;
