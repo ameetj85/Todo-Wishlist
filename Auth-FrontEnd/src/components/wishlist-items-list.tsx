@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type DragEvent } from "react";
-import { ExternalLink, Package, Pencil, Trash2, TriangleAlert } from "lucide-react";
+import { ExternalLink, Loader2, Package, Pencil, Sparkles, Trash2, TriangleAlert } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -12,7 +12,7 @@ import {
   createWishlistItemAction,
   deleteWishlistItemAction,
   compressWishlistImageAction,
-  extractWishlistImageAction,
+  extractWishlistItemInfoAction,
   updateWishlistItemAction,
 } from "@/app/actions/wishlist";
 import { readImageFileForUpload } from "@/lib/image-upload";
@@ -47,6 +47,9 @@ type NewItemForm = {
 type WishlistItemsListProps = {
   initialItems: WishlistItem[];
 };
+
+// Product page titles are often long and keyword-stuffed; keep just the start of them.
+const EXTRACTED_TITLE_MAX_LENGTH = 30;
 
 function getPriorityLabel(priority: number) {
   if (priority === 0) return "High";
@@ -84,9 +87,13 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [purchasedDeleteAcknowledged, setPurchasedDeleteAcknowledged] = useState(false);
   const [itemImageBase64, setItemImageBase64] = useState<string | null>(null);
-  const [isExtractingImage, setIsExtractingImage] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
   const [isProcessingImage, setIsProcessingImage] = useState(false);
   const [urlImageUnavailable, setUrlImageUnavailable] = useState(false);
+  const [extractionNotice, setExtractionNotice] = useState<{
+    tone: "success" | "warning";
+    message: string;
+  } | null>(null);
   const [visibleImageItemIds, setVisibleImageItemIds] = useState<number[]>([]);
   const [form, setForm] = useState<NewItemForm>({
     title: "",
@@ -231,35 +238,60 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
       priority: "1",
     });
     setItemImageBase64(null);
-    setIsExtractingImage(false);
+    setIsExtracting(false);
     setIsProcessingImage(false);
     setUrlImageUnavailable(false);
+    setExtractionNotice(null);
     setEditingItemId(null);
     setEditingItem(null);
   }
 
-  async function extractImageFromUrl() {
+  async function extractInformationFromUrl() {
     const url = form.url.trim();
-    const title = form.title.trim();
 
     if (!url) {
-      setError("Enter a URL first before extracting an image");
+      setError("Enter a URL first before extracting information");
       return;
     }
 
     setError(null);
-    setIsExtractingImage(true);
+    setExtractionNotice(null);
+    setIsExtracting(true);
 
-    const payload = await extractWishlistImageAction(url, title);
+    try {
+      const payload = await extractWishlistItemInfoAction(url);
 
-    if (payload.imageBase64) {
-      setItemImageBase64(payload.imageBase64);
-      setUrlImageUnavailable(false);
-    } else {
-      setUrlImageUnavailable(true);
+      if (!payload.ok) {
+        setError(payload.error);
+        return;
+      }
+
+      const { title, price, imageBase64 } = payload;
+
+      setForm((prev) => ({
+        ...prev,
+        title: title ? Array.from(title).slice(0, EXTRACTED_TITLE_MAX_LENGTH).join("").trimEnd() : prev.title,
+        price: price !== null ? String(price) : prev.price,
+      }));
+
+      if (imageBase64) {
+        setItemImageBase64(imageBase64);
+      }
+      setUrlImageUnavailable(!imageBase64);
+
+      const missing = [!title && "name", price === null && "price", !imageBase64 && "image"].filter(Boolean);
+      setExtractionNotice(
+        missing.length === 0
+          ? { tone: "success", message: "Filled in the name, price and image from the page." }
+          : missing.length === 3
+            ? { tone: "warning", message: "Couldn't find item details on that page. Please enter them manually." }
+            : { tone: "warning", message: `Couldn't find the ${missing.join(" or ")} on that page. Please enter it manually.` },
+      );
+    } catch {
+      setError("Unable to extract information from that URL");
+    } finally {
+      setIsExtracting(false);
     }
-
-    setIsExtractingImage(false);
   }
 
   async function onImageFileSelected(file: File | null) {
@@ -643,6 +675,55 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
             </p>
 
             <div className="mt-4 grid gap-3">
+              <div className="space-y-2">
+                <div className="space-y-1">
+                  <Label htmlFor="wishlist-url">Product URL</Label>
+                  <Input
+                    id="wishlist-url"
+                    value={form.url}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, url: event.target.value }))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && form.url.trim() && !isExtracting) {
+                        event.preventDefault();
+                        void extractInformationFromUrl();
+                      }
+                    }}
+                    placeholder="https://example.com/product"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  className="h-8 w-auto gap-1.5 px-3"
+                  disabled={!form.url.trim() || isExtracting || isProcessingImage}
+                  onClick={() => {
+                    void extractInformationFromUrl();
+                  }}
+                >
+                  {isExtracting ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="size-4" />
+                  )}
+                  {isExtracting ? "Extracting Information..." : "Extract Information"}
+                </Button>
+                {isExtracting ? (
+                  <p className="text-xs text-muted-foreground">
+                    Reading the product page for its name, price and image. This can take a few seconds.
+                  </p>
+                ) : extractionNotice ? (
+                  <p
+                    role="status"
+                    className={`text-xs ${extractionNotice.tone === "success" ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}
+                  >
+                    {extractionNotice.message}
+                  </p>
+                ) : null}
+              </div>
+
               <div className="space-y-1">
                 <Label htmlFor="wishlist-title">Title</Label>
                 <Input
@@ -670,21 +751,6 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
               </div>
 
               <div className="space-y-1">
-                <Label htmlFor="wishlist-url">Product URL</Label>
-                <Input
-                  id="wishlist-url"
-                  value={form.url}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, url: event.target.value }))
-                  }
-                  placeholder="https://example.com/product"
-                />
-                {isExtractingImage ? (
-                  <p className="text-xs text-muted-foreground">Extracting image from URL...</p>
-                ) : null}
-              </div>
-
-              <div className="space-y-1">
                 <Label>Image Preview</Label>
                 <div className="flex items-center gap-3">
                   {itemImageBase64 ? (
@@ -708,21 +774,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                       variant="outline"
                       size="icon-sm"
                       className="h-8 w-auto px-3"
-                      disabled={isExtractingImage || isProcessingImage}
-                      onClick={() => {
-                        void extractImageFromUrl();
-                      }}
-                    >
-                      {isExtractingImage
-                        ? "Extracting..."
-                        : "Extract Image from URL"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      className="h-8 w-auto px-3"
-                      disabled={isExtractingImage || isProcessingImage}
+                      disabled={isExtracting || isProcessingImage}
                       onClick={() => manualImageInputRef.current?.click()}
                     >
                       {isProcessingImage ? "Processing..." : "Choose Image"}
@@ -815,7 +867,7 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
                 type="button"
                 size="icon-sm"
                 className="h-8 w-auto px-3"
-                disabled={isSaving || isExtractingImage || isProcessingImage}
+                disabled={isSaving || isExtracting || isProcessingImage}
                 onClick={saveItem}
               >
                 {isSaving
