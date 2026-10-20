@@ -39,9 +39,11 @@ const SCRAPER_API_DEADLINE_MS = 90_000;
 // Bot-check / captcha interstitials served instead of the product page.
 const BLOCK_PAGE_TITLE_PATTERN =
   /^\s*(?:robot or human|robot check|are you a (?:robot|human)|access denied|just a moment|attention required|pardon our interruption|security check|verify you are (?:a )?human|captcha)/i;
-const BLOCK_PAGE_MARKER_PATTERN = /px-captcha|\/errors\/validateCaptcha|captcha-delivery\.com|cf-chl-|challenges\.cloudflare\.com/i;
+const BLOCK_PAGE_MARKER_PATTERN =
+  /px-captcha|\/errors\/validateCaptcha|opfcaptcha|awswaf|gokuProps|captcha-delivery\.com|cf-chl-|challenges\.cloudflare\.com/i;
 // Real product pages are large; only small pages are checked for challenge markers.
 const BLOCK_PAGE_MAX_BYTES = 100_000;
+const STUB_PAGE_MAX_BYTES = 30_000;
 
 // Amazon hides the price from visitors outside the store's delivery country (e.g. the
 // Helsinki server on amazon.com), so such pages are re-fetched as a local visitor.
@@ -548,17 +550,30 @@ export type ExtractedItemInfo = {
   blocked: boolean;
 };
 
-type PageFetchResult = { html: string; finalUrl: string } | "blocked" | null;
+/** A usable page, a bot-check page (with the reason, for the logs), or nothing. */
+type PageFetchResult = { html: string; finalUrl: string } | { blocked: string } | null;
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function isBlockPage(status: number, html: string) {
-  if (status === 403 || status === 429 || status === 503) return true;
+function isBlocked(page: PageFetchResult): page is { blocked: string } {
+  return page !== null && "blocked" in page;
+}
 
-  const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "";
-  if (BLOCK_PAGE_TITLE_PATTERN.test(decodeHtmlEntities(title))) return true;
+/** Why the response is a bot-check page rather than the product page, or null if it isn't one. */
+function getBlockReason(status: number, html: string, pageUrl: string) {
+  const title = decodeHtmlEntities(html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "").trim().slice(0, 60);
+  const described = (reason: string) => `${reason}, ${Math.round(html.length / 1024)}KB, title "${title}"`;
 
-  return html.length < BLOCK_PAGE_MAX_BYTES && BLOCK_PAGE_MARKER_PATTERN.test(html);
+  if (status === 403 || status === 429 || status === 503) return described(`HTTP ${status}`);
+  if (BLOCK_PAGE_TITLE_PATTERN.test(title)) return described("bot-check title");
+  if (html.length >= BLOCK_PAGE_MAX_BYTES) return null;
+  if (BLOCK_PAGE_MARKER_PATTERN.test(html)) return described("bot-check markup");
+
+  // Interstitials and JS challenges (e.g. Amazon's ~4KB page to datacenter IPs) are tiny and
+  // carry no product images; a real product page always has some.
+  if (html.length < STUB_PAGE_MAX_BYTES && findImageCandidates(html, pageUrl).length === 0) return described("stub page");
+
+  return null;
 }
 
 async function fetchPageHtml(url: string): Promise<PageFetchResult> {
@@ -568,7 +583,8 @@ async function fetchPageHtml(url: string): Promise<PageFetchResult> {
   if (contentType && !/html|xml|text\/plain/i.test(contentType)) throw new Error(`not HTML (${contentType})`);
 
   const html = await response.text();
-  if (isBlockPage(response.status, html)) return "blocked";
+  const blocked = getBlockReason(response.status, html, finalUrl.toString());
+  if (blocked) return { blocked };
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   return { html, finalUrl: finalUrl.toString() };
@@ -591,7 +607,8 @@ async function fetchPageViaScraperApi(url: string, apiKey: string, timeoutMs: nu
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const html = await response.text();
-  return isBlockPage(response.status, html) ? "blocked" : { html, finalUrl: url };
+  const blocked = getBlockReason(response.status, html, url);
+  return blocked ? { blocked } : { html, finalUrl: url };
 }
 
 /**
@@ -642,15 +659,15 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
 
     let page = useScraperApi ? null : await fetchPageHtml(normalizedUrl).catch(note(`pass ${attempt} page`));
 
-    if (page === "blocked") {
-      trace.push(`pass ${attempt} page: blocked`);
+    if (isBlocked(page)) {
+      trace.push(`pass ${attempt} page: blocked (${page.blocked})`);
       result.blocked = true;
       if (!scraperApiKey) break;
       useScraperApi = true;
       deadline = Math.max(deadline, Date.now() + SCRAPER_API_DEADLINE_MS);
     }
 
-    if (page && page !== "blocked" && scraperApiKey && REGION_RESTRICTED_PAGE_PATTERN.test(page.html)) {
+    if (page && !isBlocked(page) && scraperApiKey && REGION_RESTRICTED_PAGE_PATTERN.test(page.html)) {
       trace.push(`pass ${attempt} page: region-restricted`);
       useScraperApi = true;
       deadline = Math.max(deadline, Date.now() + SCRAPER_API_DEADLINE_MS);
@@ -661,13 +678,13 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
       scraperApiAttempts += 1;
       const timeoutMs = Math.min(SCRAPER_API_TIMEOUT_MS, deadline - Date.now());
       const proxied = await fetchPageViaScraperApi(normalizedUrl, scraperApiKey, timeoutMs).catch(note(`pass ${attempt} ScraperAPI`));
-      if (proxied === "blocked") trace.push(`pass ${attempt} ScraperAPI: blocked`);
+      if (isBlocked(proxied)) trace.push(`pass ${attempt} ScraperAPI: blocked (${proxied.blocked})`);
       // Keep a region-restricted direct page if the proxied fetch fails; it still has the title and images.
-      if (proxied !== null && proxied !== "blocked") page = proxied;
-      else if (page === null || page === "blocked") page = proxied;
+      if (proxied !== null && !isBlocked(proxied)) page = proxied;
+      else if (page === null || isBlocked(page)) page = proxied;
     }
 
-    if (!page || page === "blocked") continue;
+    if (!page || isBlocked(page)) continue;
     gotPage = true;
 
     try {
