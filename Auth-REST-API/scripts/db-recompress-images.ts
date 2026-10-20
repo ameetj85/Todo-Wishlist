@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-'use strict';
 // npm run db:recompress-images            (dry run: reports what would change)
 // npm run db:recompress-images -- --apply (backs up the database, then rewrites images)
 //
@@ -8,11 +7,16 @@
 // in that format, that would not get smaller, or that cannot be decoded are left as is.
 // Safe to run repeatedly. Requires the `sharp` dev dependency.
 
-require('dotenv').config();
-const path = require('path');
-const { prisma } = require('../src/db/prisma');
+import dotenv from 'dotenv';
 
-let sharp;
+dotenv.config();
+
+import path from 'path';
+import type { Metadata } from 'sharp';
+import { prisma } from '../src/db/prisma';
+
+// Loaded lazily so a missing dev dependency gets a friendly message.
+let sharp: typeof import('sharp');
 try {
   sharp = require('sharp');
 } catch {
@@ -29,8 +33,8 @@ const OUTPUT_TARGET_BYTES = 60 * 1024;
 const BATCH_SIZE = 50;
 const apply = process.argv.includes('--apply');
 
-async function compressImageForStorage(inputBuffer) {
-  const encode = (quality) =>
+async function compressImageForStorage(inputBuffer: Buffer): Promise<Buffer> {
+  const encode = (quality: number) =>
     sharp(inputBuffer)
       .rotate()
       .flatten({ background: '#ffffff' })
@@ -54,7 +58,7 @@ async function compressImageForStorage(inputBuffer) {
   return outputBuffer;
 }
 
-function isAlreadyCompressed(metadata) {
+function isAlreadyCompressed(metadata: Metadata): boolean {
   return (
     metadata.format === 'webp' &&
     Math.max(metadata.width ?? 0, metadata.height ?? 0) <= OUTPUT_MAX_DIMENSION
@@ -75,7 +79,7 @@ async function backupDatabase() {
   return backupPath;
 }
 
-function formatKb(bytes) {
+function formatKb(bytes: number): string {
   return `${(bytes / 1024).toFixed(1)} KB`;
 }
 
@@ -90,7 +94,7 @@ async function main() {
   const stats = { total: 0, recompressed: 0, alreadyCompressed: 0, notSmaller: 0, unreadable: 0 };
   let bytesBefore = 0;
   let bytesAfter = 0;
-  let cursor;
+  let cursor: number | undefined;
 
   for (;;) {
     const rows = await prisma.wishlistItem.findMany({
@@ -106,10 +110,11 @@ async function main() {
 
     for (const row of rows) {
       stats.total += 1;
-      const original = Buffer.from(row.itemImage);
+      // The query only returns rows that have an image.
+      const original = Buffer.from(row.itemImage!);
       bytesBefore += original.byteLength;
 
-      let compressed;
+      let compressed: Buffer;
       try {
         const metadata = await sharp(original).metadata();
         if (isAlreadyCompressed(metadata)) {
@@ -135,7 +140,8 @@ async function main() {
       if (apply) {
         await prisma.wishlistItem.update({
           where: { itemId: row.itemId },
-          data: { itemImage: compressed },
+          // sharp returns a Buffer backed by a plain ArrayBuffer.
+          data: { itemImage: compressed as Buffer<ArrayBuffer> },
         });
       }
 
@@ -145,7 +151,7 @@ async function main() {
   }
 
   console.log(apply ? 'Image recompression complete.' : 'Image recompression dry run complete.');
-  const lines = [
+  const lines: [string, string | number][] = [
     ['Items with images', stats.total],
     [apply ? 'Recompressed' : 'Would recompress', stats.recompressed],
     ['Already compressed', stats.alreadyCompressed],

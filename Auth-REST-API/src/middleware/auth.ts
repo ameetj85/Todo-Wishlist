@@ -1,9 +1,16 @@
-'use strict';
+import type { NextFunction, Request, Response } from 'express';
+import { prisma } from '../db/prisma';
+import { toSqliteDate } from '../utils/dates';
 
-const { prisma } = require('../db/prisma');
-const { toSqliteDate } = require('../utils/dates');
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  isVerified: boolean;
+  isAdmin: boolean;
+}
 
-async function requireAuth(req, res, next) {
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers['authorization'];
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
@@ -35,5 +42,3 @@ async function requireAuth(req, res, next) {
 
   next();
 }
-
-module.exports = { requireAuth };

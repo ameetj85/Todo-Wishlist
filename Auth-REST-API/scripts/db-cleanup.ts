@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-'use strict';
 // npm run db:cleanup
 // Removes expired sessions and used/expired password reset tokens.
 // Safe to run at any time; schedule with cron in production.
 
-require('dotenv').config();
-const { prisma } = require('../src/db/prisma');
-const { toSqliteDate } = require('../src/utils/dates');
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+import { prisma } from '../src/db/prisma';
+import { toSqliteDate } from '../src/utils/dates';
 
 async function main() {
   const now = toSqliteDate(Date.now());

@@ -1,0 +1,91 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+import path from 'path';
+import express, { type NextFunction, type Request, type Response } from 'express';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
+import config from './src/config';
+import authRoutes from './src/routes/auth';
+import adminRoutes from './src/routes/admin';
+import todoRoutes from './src/routes/todo';
+import wishlistRoutes from './src/routes/wishlist';
+
+const app = express();
+const isDevelopment = config.server.env !== 'production';
+
+// ─── Security & Parsing ───────────────────────────────────────────────────────
+app.use(helmet());
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: true, limit: '8mb' }));
+app.set('trust proxy', 1);
+
+// ─── Rate Limiting ────────────────────────────────────────────────────────────
+app.use(
+  rateLimit({
+    ...config.rateLimit.global,
+    max: isDevelopment ? Math.max(config.rateLimit.global.max, 1000) : config.rateLimit.global.max,
+    skip: (req) => req.path.startsWith('/api/auth/'),
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later' },
+  }),
+);
+
+const authLimiter = rateLimit({
+  ...config.rateLimit.auth,
+  max: isDevelopment ? Math.max(config.rateLimit.auth.max, 100) : config.rateLimit.auth.max,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts, please try again later' },
+});
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/todos', todoRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: config.server.env,
+  });
+});
+
+// ─── 404 & Error Handler ──────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ error: `Route ${req.method} ${req.path} not found` });
+});
+
+app.use((err: { type?: string; stack?: string; message?: string }, req: Request, res: Response, _next: NextFunction) => {
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'Request payload too large (max 8MB)' });
+  }
+
+  console.error(err.stack);
+  res.status(500).json({
+    error: config.server.isProd ? 'Internal server error' : err.message,
+  });
+});
+
+// ─── Start ────────────────────────────────────────────────────────────────────
+// Listen when run directly (node dist/server.js) or through the root server.js launcher.
+const launcher = path.resolve(__dirname, '..', 'server.js');
+if (require.main === module || require.main?.filename === launcher) {
+  app.listen(config.server.port, () => {
+    console.log(`🚀 Auth API  →  http://localhost:${config.server.port}`);
+    console.log(`   Env          : ${config.server.env}`);
+    console.log(`   Session TTL  : ${config.session.expiryHours}h`);
+    console.log(`   DB path      : ${config.db.path}`);
+  });
+}
+
+export = app;

@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    // Tests stay JavaScript and are copied into dist so they exercise the compiled API.
+    "allowJs": true,
+    "checkJs": false
+  },
+  "include": ["server.ts", "src/**/*", "scripts/**/*"]
+}

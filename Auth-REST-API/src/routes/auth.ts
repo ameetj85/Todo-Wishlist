@@ -1,14 +1,12 @@
-'use strict';
-
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
-const { prisma } = require('../db/prisma');
-const { requireAuth } = require('../middleware/auth');
-const { sendPasswordResetEmail, sendVerificationEmail } = require('../utils/email');
-const { toSqliteDate } = require('../utils/dates');
-const config = require('../config');
-const { validateSignup, validateLogin, validatePassword } = require('../validators');
+import express, { type Request } from 'express';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { prisma } from '../db/prisma';
+import { requireAuth } from '../middleware/auth';
+import { sendPasswordResetEmail, sendVerificationEmail } from '../utils/email';
+import { toSqliteDate } from '../utils/dates';
+import config from '../config';
+import { validateSignup, validateLogin, validatePassword } from '../validators';
 
 const router = express.Router();
 
@@ -20,7 +18,7 @@ function resetTokenExpiry() {
   return toSqliteDate(Date.now() + config.passwordReset.expiryMinutes * 60_000);
 }
 
-async function createSession(userId, req) {
+async function createSession(userId: string, req: Request) {
   const token = uuidv4();
   const sessionId = uuidv4();
 
@@ -89,7 +87,7 @@ router.post('/signup', async (req, res) => {
     await sendVerificationEmail(normalizedEmail, name.trim(), verificationToken);
     console.log(`Verification email sent to ${normalizedEmail}`);
   } catch (e) {
-    console.error('[email] Failed to send verification email:', e.message);
+    console.error('[email] Failed to send verification email:', (e as Error).message);
     // Still consider signup successful even if email fails
   }
 
@@ -207,7 +205,7 @@ router.post('/forgot-password', async (req, res) => {
       await sendPasswordResetEmail(user.email, user.name, resetToken);
       console.log(`Password reset email sent to ${user.email}`);
     } catch (e) {
-      console.error('[email] Failed to send reset email:', e.message);
+      console.error('[email] Failed to send reset email:', (e as Error).message);
     }
   }
 
@@ -376,4 +374,4 @@ router.post('/verify-email', async (req, res) => {
   return res.json({ message: 'Email verified successfully. You can now log in.' });
 });
 
-module.exports = router;
+export default router;

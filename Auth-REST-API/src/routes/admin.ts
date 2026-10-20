@@ -1,29 +1,35 @@
-'use strict';
-
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const { v4: uuidv4 } = require('uuid');
-const { prisma } = require('../db/prisma');
-const { requireAuth } = require('../middleware/auth');
-const config = require('../config');
-const { validatePassword } = require('../validators');
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import type { Prisma, WishlistItem } from '@prisma/client';
+import { prisma } from '../db/prisma';
+import { requireAuth } from '../middleware/auth';
+import config from '../config';
+import { validatePassword } from '../validators';
 
 const router = express.Router();
 
-function parseItemId(value) {
-  const itemId = Number.parseInt(value, 10);
+function parseItemId(value: unknown): number | null {
+  // parseInt coerces non-strings the same way the JS version did.
+  const itemId = Number.parseInt(value as string, 10);
   return Number.isInteger(itemId) && itemId > 0 ? itemId : null;
 }
 
-function parseInteger(value, fieldName, { min = null } = {}) {
+function parseInteger(
+  value: unknown,
+  fieldName: string,
+  { min = null }: { min?: number | null } = {},
+): string | null {
   if (!Number.isInteger(value)) return `${fieldName} must be an integer`;
-  if (min !== null && value < min) {
+  if (min !== null && (value as number) < min) {
     return `${fieldName} must be greater than or equal to ${min}`;
   }
   return null;
 }
 
-function parsePrice(value) {
+type Parsed<T> = { error: string; value?: undefined } | { error?: undefined; value: T };
+
+function parsePrice(value: unknown): Parsed<number> {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return { error: 'price must be a number' };
   }
@@ -35,7 +41,9 @@ function parsePrice(value) {
   return { value };
 }
 
-function parseOptionalImageBlob(itemImage) {
+type ParsedImage = { error: string; blob?: undefined } | { error?: undefined; blob: Buffer<ArrayBuffer> | null };
+
+function parseOptionalImageBlob(itemImage: unknown): ParsedImage {
   if (itemImage === null) return { blob: null };
 
   if (typeof itemImage !== 'string') {
@@ -50,7 +58,12 @@ function parseOptionalImageBlob(itemImage) {
   }
 }
 
-function toAdminWishlistResponse(item) {
+type AdminWishlistRow = Omit<WishlistItem, 'itemImage'> & {
+  itemImage: Uint8Array | null;
+  user?: { name: string } | null;
+};
+
+function toAdminWishlistResponse(item: AdminWishlistRow) {
   return {
     item_id: item.itemId,
     user_id: item.userId,
@@ -161,7 +174,7 @@ router.put('/users/:userId', async (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  const data = {};
+  const data: Prisma.UserUpdateInput = {};
 
   if (email !== undefined) {
     const normalizedEmail = String(email).toLowerCase().trim();
@@ -263,7 +276,7 @@ router.put('/wishlists/:itemId', async (req, res) => {
     created_date,
   } = req.body;
 
-  const data = {};
+  const data: Prisma.WishlistItemUncheckedUpdateInput = {};
 
   if (user_id !== undefined) {
     const userId = String(user_id).trim();
@@ -307,13 +320,13 @@ router.put('/wishlists/:itemId', async (req, res) => {
 
   if (item_image !== undefined) {
     const image = parseOptionalImageBlob(item_image);
-    if (image.error) return res.status(400).json({ error: image.error });
+    if (image.error !== undefined) return res.status(400).json({ error: image.error });
     data.itemImage = image.blob;
   }
 
   if (price !== undefined) {
     const parsedPrice = parsePrice(price);
-    if (parsedPrice.error) {
+    if (parsedPrice.error !== undefined) {
       return res.status(400).json({ error: parsedPrice.error });
     }
     data.price = parsedPrice.value;
@@ -454,4 +467,4 @@ router.get('/overview', async (_req, res) => {
   });
 });
 
-module.exports = router;
+export default router;
