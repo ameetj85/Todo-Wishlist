@@ -1,7 +1,7 @@
 "use server";
 
 import { getAuthToken } from "@/lib/auth-cookie";
-import { compressImageForStorage, extractImageFromPage } from "@/lib/extract-image";
+import { compressImageForStorage, extractItemInfoFromPage } from "@/lib/extract-image";
 
 type WishlistPayload = {
   title: string;
@@ -114,12 +114,16 @@ export async function deleteWishlistItemAction(itemId: number) {
   }
 }
 
-export async function extractWishlistImageAction(url: string, title?: string) {
+export async function extractWishlistItemInfoAction(url: string) {
   const tokenResult = await getToken();
-  if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error, imageBase64: null };
+  if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error, title: null, price: null, imageBase64: null };
 
-  const imageBase64 = await extractImageFromPage(url, title);
-  return { ok: true as const, imageBase64 };
+  try {
+    const info = await extractItemInfoFromPage(url);
+    return { ok: true as const, ...info };
+  } catch {
+    return { ok: false as const, error: "Unable to read that page", title: null, price: null, imageBase64: null };
+  }
 }
 
 export async function compressWishlistImageAction(imageBase64: string) {

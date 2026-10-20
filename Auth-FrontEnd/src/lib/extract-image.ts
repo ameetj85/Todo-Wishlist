@@ -2,6 +2,9 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import sharp from "sharp";
 
+import { findProductDetails } from "@/lib/extract-product-details";
+import { decodeHtmlEntities, decodeJsonEscapes, getAttribute, getJsonLdBlocks } from "@/lib/html-utils";
+
 // Many retailers (Amazon in particular) serve a bot/captcha page to requests
 // without browser-like headers, so mimic a regular desktop browser.
 const BROWSER_HEADERS = {
@@ -20,6 +23,11 @@ const MAX_DOWNLOAD_BYTES = 15 * 1024 * 1024;
 const MIN_IMAGE_DIMENSION = 100;
 const MAX_ASPECT_RATIO = 4;
 const TITLE_RELEVANCE_THRESHOLD = 0.5;
+
+// Passes over the page when the title, price or image isn't found on the first fetch.
+const EXTRACTION_ATTEMPTS = 3;
+const EXTRACTION_RETRY_DELAY_MS = 1_500;
+const EXTRACTION_DEADLINE_MS = 30_000;
 
 // Stored images are shown at most ~330 CSS px (grid view) and 80 px (list view), so 640 px
 // keeps them crisp on 2x displays. WebP is roughly 30% smaller than JPEG at the same quality.
@@ -41,23 +49,6 @@ const PRIMARY_IMAGE_PATTERN =
   /\s(?:id|class)=["']?[^"'>]*\b(?:landingImage|imgBlkFront|main-?image|primary-?image|product-?image|hero-?image|product-?photo)\b|\sfetchpriority=["']?high|\sitemprop=["']?image/i;
 
 type ImageCandidate = { url: string; relevance: number; isPrimary: boolean; position: number };
-
-function decodeHtmlEntities(value: string) {
-  return value
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, code: string) => String.fromCodePoint(parseInt(code, 16)))
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&");
-}
-
-function decodeJsonEscapes(value: string) {
-  return value
-    .replace(/\\u([0-9a-f]{4})/gi, (_, code: string) => String.fromCharCode(parseInt(code, 16)))
-    .replace(/\\\//g, "/");
-}
 
 function isPrivateAddress(address: string) {
   if (isIP(address) === 6) {
@@ -121,12 +112,6 @@ async function safeFetch(rawUrl: string, accept: string, referer?: string) {
   throw new Error("Too many redirects");
 }
 
-function getAttribute(tag: string, name: string) {
-  const match = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i"));
-  const value = match?.[1] ?? match?.[2] ?? match?.[3];
-  return value === undefined ? null : decodeHtmlEntities(value).trim();
-}
-
 function largestFromSrcset(srcset: string) {
   let best: { url: string; size: number } | null = null;
 
@@ -159,8 +144,13 @@ function getBestSourceFromTag(tag: string) {
     }
   }
 
+  // Lazy loaders keep the real URL in a data-* attribute and put a placeholder in src/srcset
+  // until the image scrolls into view, so data-* attributes win over src.
   const srcset =
-    getAttribute(tag, "data-srcset") ?? getAttribute(tag, "data-lazy-srcset") ?? getAttribute(tag, "srcset");
+    getAttribute(tag, "data-srcset") ??
+    getAttribute(tag, "data-lazy-srcset") ??
+    getAttribute(tag, "data-original-set") ??
+    getAttribute(tag, "srcset");
   const fromSrcset = srcset ? largestFromSrcset(srcset) : null;
 
   const candidates = [
@@ -169,11 +159,32 @@ function getBestSourceFromTag(tag: string) {
     getAttribute(tag, "data-lazy-src"),
     getAttribute(tag, "data-original"),
     getAttribute(tag, "data-lazy"),
+    getAttribute(tag, "data-echo"),
+    getAttribute(tag, "data-ll-src"),
+    getAttribute(tag, "data-img-src"),
+    getAttribute(tag, "data-image"),
+    getAttribute(tag, "data-img"),
+    getAttribute(tag, "data-orig-file"),
+    getAttribute(tag, "data-large-file"),
+    getAttribute(tag, "data-pin-media"),
     getAttribute(tag, "data-url"),
+    getAttribute(tag, "data-bg"),
+    getAttribute(tag, "data-background-image"),
     getAttribute(tag, "src"),
   ];
 
-  return candidates.find((value) => value && !value.startsWith("data:")) ?? null;
+  const source = candidates.find((value) => value && !value.startsWith("data:")) ?? null;
+  return source ? fillWidthTemplate(source, getAttribute(tag, "data-widths")) : null;
+}
+
+// Responsive lazy loaders (lazysizes, Shopify themes) use templates like "product_{width}x.jpg"
+// with the allowed widths in data-widths="[180,360,720,1080]".
+function fillWidthTemplate(url: string, widths: string | null) {
+  if (!/\{width\}|%7Bwidth%7D/i.test(url)) return url;
+
+  const allowed = (widths?.match(/\d+/g) ?? []).map(Number).filter((width) => width > 0);
+  const width = allowed.length > 0 ? Math.max(...allowed.filter((value) => value <= 1200), Math.min(...allowed)) : 1024;
+  return url.replace(/\{width\}|%7Bwidth%7D/gi, String(width));
 }
 
 function tokenize(value: string) {
@@ -321,16 +332,7 @@ function collectJsonLdImages(node: unknown, results: string[], insideProduct = f
 
 function getJsonLdImages(html: string) {
   const results: string[] = [];
-  const scripts = html.matchAll(/<script\b[^>]*type=["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi);
-
-  for (const [, content] of scripts) {
-    try {
-      collectJsonLdImages(JSON.parse(content.trim()), results);
-    } catch {
-      // ignore malformed JSON-LD blocks
-    }
-  }
-
+  getJsonLdBlocks(html).forEach((block) => collectJsonLdImages(block, results));
   return results;
 }
 
@@ -340,10 +342,16 @@ function getAmazonGalleryImages(html: string) {
 }
 
 // CSS background images, e.g. <div style="background-image: url('...')">.
+// Lazy background loaders keep the URL in data-bg / data-background-image / data-bgset instead.
 function getBackgroundImages(html: string) {
-  return [...html.matchAll(/background(?:-image)?\s*:[^;"'>]*url\(\s*(?:&quot;|["'])?([^"')&]+)(?:&quot;|["'])?\s*\)/gi)].map(
+  const inline = [...html.matchAll(/background(?:-image)?\s*:[^;"'>]*url\(\s*(?:&quot;|["'])?([^"')&]+)(?:&quot;|["'])?\s*\)/gi)].map(
     ([, url]) => decodeHtmlEntities(url),
   );
+  const lazy = [...html.matchAll(/\sdata-(?:bg|background-image|bgset|bg-src)=["']([^"']+)["']/gi)]
+    .map(([, value]) => decodeHtmlEntities(value).replace(/^url\(\s*["']?|["']?\s*\)$/g, ""))
+    .map((value) => largestFromSrcset(value) ?? value);
+
+  return [...inline, ...lazy];
 }
 
 // Last resort for script-rendered pages (Next.js, Shopify, etc.): absolute image URLs inside scripts.
@@ -511,33 +519,96 @@ async function downloadImageAsBase64(imageUrl: string, pageUrl: string) {
   return optimizedBuffer.toString("base64");
 }
 
+export type ExtractedItemInfo = {
+  title: string | null;
+  price: number | null;
+  imageBase64: string | null;
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchPageHtml(url: string) {
+  const { response, finalUrl } = await safeFetch(url, HTML_ACCEPT);
+  if (!response.ok) return null;
+
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType && !/html|xml|text\/plain/i.test(contentType)) return null;
+
+  return { html: await response.text(), finalUrl: finalUrl.toString() };
+}
+
+/**
+ * Title, price and image for the product page at `rawUrl`.
+ *
+ * Raw HTML is all a server-side fetch sees, so lazily loaded images often aren't in their
+ * final form on the first pass, and retailers intermittently return bot-check or skeleton
+ * pages. Extraction therefore runs up to EXTRACTION_ATTEMPTS passes: each pass re-fetches
+ * the page, fills in whatever is still missing, and tries the next batch of image candidates
+ * it hasn't tried yet, backing off a little longer between passes.
+ */
+export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string): Promise<ExtractedItemInfo> {
+  const result: ExtractedItemInfo = { title: null, price: null, imageBase64: null };
+  const deadline = Date.now() + EXTRACTION_DEADLINE_MS;
+  const triedImages = new Set<string>();
+
+  let normalizedUrl: string;
+  try {
+    normalizedUrl = new URL(/^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`).toString();
+  } catch {
+    return result;
+  }
+
+  // Direct links to an image file need no page parsing.
+  if (IMAGE_EXTENSION_PATTERN.test(new URL(normalizedUrl).pathname)) {
+    result.imageBase64 = await downloadImageAsBase64(normalizedUrl, normalizedUrl).catch(() => null);
+    if (result.imageBase64) return result;
+  }
+
+  for (let attempt = 1; attempt <= EXTRACTION_ATTEMPTS && Date.now() < deadline; attempt += 1) {
+    if (attempt > 1) await wait(EXTRACTION_RETRY_DELAY_MS * (attempt - 1));
+
+    const page = await fetchPageHtml(normalizedUrl).catch(() => null);
+
+    if (!page) continue;
+
+    try {
+      const details = findProductDetails(page.html, page.finalUrl);
+      result.title ??= details.title;
+      result.price ??= details.price;
+
+      if (!result.imageBase64) {
+        const relevanceTitle = titleHint || result.title || undefined;
+        const candidates = findImageCandidates(page.html, page.finalUrl, relevanceTitle)
+          .filter((candidate) => !triedImages.has(candidate))
+          .slice(0, MAX_CANDIDATES);
+
+        // Try each candidate in priority order until one downloads as a real, reasonably sized image.
+        for (const candidate of candidates) {
+          if (Date.now() >= deadline) break;
+          triedImages.add(candidate);
+
+          try {
+            result.imageBase64 = await downloadImageAsBase64(candidate, page.finalUrl);
+            if (result.imageBase64) break;
+          } catch {
+            // try the next candidate
+          }
+        }
+      }
+    } catch {
+      // unparseable page; retry on the next pass
+    }
+
+    // Many pages genuinely have no price in their HTML, so only a missing title or image forces another pass.
+    if (result.title && result.imageBase64) break;
+  }
+
+  return result;
+}
+
 export async function extractImageFromPage(rawUrl: string, title?: string) {
   try {
-    const normalizedUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
-
-    // Direct links to an image file need no page parsing.
-    if (IMAGE_EXTENSION_PATTERN.test(new URL(normalizedUrl).pathname)) {
-      const direct = await downloadImageAsBase64(normalizedUrl, normalizedUrl).catch(() => null);
-      if (direct) return direct;
-    }
-
-    const { response, finalUrl } = await safeFetch(normalizedUrl, HTML_ACCEPT);
-    if (!response.ok) return null;
-
-    const html = await response.text();
-    const candidates = findImageCandidates(html, finalUrl.toString(), title).slice(0, MAX_CANDIDATES);
-
-    // Try each candidate in priority order until one downloads as a real, reasonably sized image.
-    for (const candidate of candidates) {
-      try {
-        const imageBase64 = await downloadImageAsBase64(candidate, finalUrl.toString());
-        if (imageBase64) return imageBase64;
-      } catch {
-        // try the next candidate
-      }
-    }
-
-    return null;
+    return (await extractItemInfoFromPage(rawUrl, title)).imageBase64;
   } catch {
     return null;
   }
