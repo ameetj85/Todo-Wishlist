@@ -43,6 +43,11 @@ const BLOCK_PAGE_MARKER_PATTERN = /px-captcha|\/errors\/validateCaptcha|captcha-
 // Real product pages are large; only small pages are checked for challenge markers.
 const BLOCK_PAGE_MAX_BYTES = 100_000;
 
+// Amazon hides the price from visitors outside the store's delivery country (e.g. the
+// Helsinki server on amazon.com), so such pages are re-fetched as a local visitor.
+const REGION_RESTRICTED_PAGE_PATTERN =
+  /cannot be shipped to your selected delivery location|doesn't ship to your (?:selected )?(?:location|country)|does not ship to (?:your|the selected) (?:location|country)/i;
+
 // Stored images are shown at most ~330 CSS px (grid view) and 80 px (list view), so 640 px
 // keeps them crisp on 2x displays. WebP is roughly 30% smaller than JPEG at the same quality.
 const OUTPUT_MAX_DIMENSION = 640;
@@ -511,23 +516,25 @@ export async function compressImageForStorage(inputBuffer: Buffer) {
   return outputBuffer;
 }
 
+/** Throws with the reason when the URL isn't a usable product image. */
 async function downloadImageAsBase64(imageUrl: string, pageUrl: string) {
   const { response } = await safeFetch(imageUrl, IMAGE_ACCEPT, pageUrl);
-  if (!response.ok) return null;
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   // Some CDNs mislabel images (e.g. application/octet-stream), so let sharp decide what is an image.
   const contentType = response.headers.get("content-type") ?? "";
-  if (/text\/html|svg|json|javascript/i.test(contentType)) return null;
+  if (/text\/html|svg|json|javascript/i.test(contentType)) throw new Error(`not an image (${contentType})`);
 
   const imageBuffer = await readLimitedBody(response);
-  if (!imageBuffer) return null;
+  if (!imageBuffer) throw new Error("too large");
 
   const metadata = await sharp(imageBuffer).metadata();
   const width = metadata.width ?? 0;
   const height = metadata.height ?? 0;
 
-  if (metadata.format === "svg" || width < MIN_IMAGE_DIMENSION || height < MIN_IMAGE_DIMENSION) return null;
-  if (Math.max(width, height) / Math.min(width, height) > MAX_ASPECT_RATIO) return null;
+  if (metadata.format === "svg") throw new Error("svg");
+  if (width < MIN_IMAGE_DIMENSION || height < MIN_IMAGE_DIMENSION) throw new Error(`too small (${width}x${height})`);
+  if (Math.max(width, height) / Math.min(width, height) > MAX_ASPECT_RATIO) throw new Error(`bad aspect ratio (${width}x${height})`);
 
   const optimizedBuffer = await compressImageForStorage(imageBuffer);
   return optimizedBuffer.toString("base64");
@@ -558,12 +565,13 @@ async function fetchPageHtml(url: string): Promise<PageFetchResult> {
   const { response, finalUrl } = await safeFetch(url, HTML_ACCEPT);
 
   const contentType = response.headers.get("content-type") ?? "";
-  if (contentType && !/html|xml|text\/plain/i.test(contentType)) return null;
+  if (contentType && !/html|xml|text\/plain/i.test(contentType)) throw new Error(`not HTML (${contentType})`);
 
   const html = await response.text();
   if (isBlockPage(response.status, html)) return "blocked";
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-  return response.ok ? { html, finalUrl: finalUrl.toString() } : null;
+  return { html, finalUrl: finalUrl.toString() };
 }
 
 // ScraperAPI fetches the page from residential IPs and returns its HTML as the response body.
@@ -571,15 +579,16 @@ async function fetchPageViaScraperApi(url: string, apiKey: string, timeoutMs: nu
   const endpoint = new URL(SCRAPER_API_ENDPOINT);
   endpoint.searchParams.set("api_key", apiKey);
   endpoint.searchParams.set("url", url);
+  // US stores show prices and stock for US visitors only.
+  if (new URL(url).hostname.endsWith(".com")) endpoint.searchParams.set("country_code", "us");
 
   const { response } = await safeFetch(endpoint.toString(), HTML_ACCEPT, undefined, timeoutMs);
 
-  // 401: bad key, 403: credits used up. Neither will fix itself, so make it visible in the server logs.
+  // 401: bad key, 403: credits used up. Neither will fix itself, so spell it out in the server logs.
   if (response.status === 401 || response.status === 403) {
-    console.warn(`ScraperAPI rejected the request (HTTP ${response.status}); check SCRAPER_API_KEY and the account's remaining credits`);
-    return null;
+    throw new Error(`HTTP ${response.status}, check SCRAPER_API_KEY and the account's remaining credits`);
   }
-  if (!response.ok) return null;
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
   const html = await response.text();
   return isBlockPage(response.status, html) ? "blocked" : { html, finalUrl: url };
@@ -596,16 +605,24 @@ async function fetchPageViaScraperApi(url: string, apiKey: string, timeoutMs: nu
  *
  * If the site answers with a bot-check page, retrying directly won't help: the page is
  * fetched through ScraperAPI instead when SCRAPER_API_KEY is set, otherwise extraction
- * stops and reports the item as blocked.
+ * stops and reports the item as blocked. Pages that withhold the price from foreign
+ * visitors are likewise re-fetched through ScraperAPI from the store's country.
  */
 export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string): Promise<ExtractedItemInfo> {
   const result: ExtractedItemInfo = { title: null, price: null, imageBase64: null, blocked: false };
   const scraperApiKey = process.env.SCRAPER_API_KEY?.trim();
-  let deadline = Date.now() + EXTRACTION_DEADLINE_MS;
+  const startedAt = Date.now();
+  let deadline = startedAt + EXTRACTION_DEADLINE_MS;
   let useScraperApi = false;
   let scraperApiAttempts = 0;
   let gotPage = false;
   const triedImages = new Set<string>();
+  // What happened at each step, logged as one line per lookup so failures can be diagnosed from the server logs.
+  const trace: string[] = [];
+  const note = (step: string) => (error: unknown) => {
+    trace.push(`${step}: ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  };
 
   let normalizedUrl: string;
   try {
@@ -616,18 +633,25 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
 
   // Direct links to an image file need no page parsing.
   if (IMAGE_EXTENSION_PATTERN.test(new URL(normalizedUrl).pathname)) {
-    result.imageBase64 = await downloadImageAsBase64(normalizedUrl, normalizedUrl).catch(() => null);
+    result.imageBase64 = await downloadImageAsBase64(normalizedUrl, normalizedUrl).catch(note("image link"));
     if (result.imageBase64) return result;
   }
 
   for (let attempt = 1; attempt <= EXTRACTION_ATTEMPTS && Date.now() < deadline; attempt += 1) {
     if (attempt > 1) await wait(EXTRACTION_RETRY_DELAY_MS * (attempt - 1));
 
-    let page = useScraperApi ? null : await fetchPageHtml(normalizedUrl).catch(() => null);
+    let page = useScraperApi ? null : await fetchPageHtml(normalizedUrl).catch(note(`pass ${attempt} page`));
 
     if (page === "blocked") {
+      trace.push(`pass ${attempt} page: blocked`);
       result.blocked = true;
       if (!scraperApiKey) break;
+      useScraperApi = true;
+      deadline = Math.max(deadline, Date.now() + SCRAPER_API_DEADLINE_MS);
+    }
+
+    if (page && page !== "blocked" && scraperApiKey && REGION_RESTRICTED_PAGE_PATTERN.test(page.html)) {
+      trace.push(`pass ${attempt} page: region-restricted`);
       useScraperApi = true;
       deadline = Math.max(deadline, Date.now() + SCRAPER_API_DEADLINE_MS);
     }
@@ -636,7 +660,11 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
       if (scraperApiAttempts >= SCRAPER_API_MAX_ATTEMPTS) break;
       scraperApiAttempts += 1;
       const timeoutMs = Math.min(SCRAPER_API_TIMEOUT_MS, deadline - Date.now());
-      page = await fetchPageViaScraperApi(normalizedUrl, scraperApiKey, timeoutMs).catch(() => null);
+      const proxied = await fetchPageViaScraperApi(normalizedUrl, scraperApiKey, timeoutMs).catch(note(`pass ${attempt} ScraperAPI`));
+      if (proxied === "blocked") trace.push(`pass ${attempt} ScraperAPI: blocked`);
+      // Keep a region-restricted direct page if the proxied fetch fails; it still has the title and images.
+      if (proxied !== null && proxied !== "blocked") page = proxied;
+      else if (page === null || page === "blocked") page = proxied;
     }
 
     if (!page || page === "blocked") continue;
@@ -652,22 +680,23 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
         const candidates = findImageCandidates(page.html, page.finalUrl, relevanceTitle)
           .filter((candidate) => !triedImages.has(candidate))
           .slice(0, MAX_CANDIDATES);
+        trace.push(`pass ${attempt} page: ${Math.round(page.html.length / 1024)}KB, ${candidates.length} new image candidates`);
 
         // Try each candidate in priority order until one downloads as a real, reasonably sized image.
         for (const candidate of candidates) {
-          if (Date.now() >= deadline) break;
+          if (Date.now() >= deadline) {
+            trace.push("deadline reached");
+            break;
+          }
           triedImages.add(candidate);
 
-          try {
-            result.imageBase64 = await downloadImageAsBase64(candidate, page.finalUrl);
-            if (result.imageBase64) break;
-          } catch {
-            // try the next candidate
-          }
+          result.imageBase64 = await downloadImageAsBase64(candidate, page.finalUrl).catch(note(candidate.slice(0, 100)));
+          if (result.imageBase64) break;
         }
       }
-    } catch {
+    } catch (error) {
       // unparseable page; retry on the next pass
+      note(`pass ${attempt} parse`)(error);
     }
 
     // Many pages genuinely have no price in their HTML, so only a missing title or image forces another pass.
@@ -675,6 +704,13 @@ export async function extractItemInfoFromPage(rawUrl: string, titleHint?: string
   }
 
   result.blocked &&= !gotPage;
+
+  const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+  console.info(
+    `[extract] ${new URL(normalizedUrl).hostname} title=${result.title ? "yes" : "no"} price=${result.price ?? "no"} ` +
+      `image=${result.imageBase64 ? "yes" : "no"} blocked=${result.blocked} ${seconds}s | ${trace.join(" ; ")}`,
+  );
+
   return result;
 }
 
