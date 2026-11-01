@@ -2,6 +2,7 @@
 
 import { getAuthToken } from "@/lib/auth-cookie";
 import { compressImageForStorage, extractItemInfoFromPage } from "@/lib/extract-image";
+import { isScraperApiConfigured, scrapeItemInfo } from "@/lib/scraper-api";
 
 type WishlistPayload = {
   title: string;
@@ -117,6 +118,16 @@ export async function deleteWishlistItemAction(itemId: number) {
 export async function extractWishlistItemInfoAction(url: string) {
   const tokenResult = await getToken();
   if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error, title: null, price: null, imageBase64: null };
+
+  // Prefer the URL scraper API; fall back to the in-process extractor when it isn't configured or can't be reached.
+  if (isScraperApiConfigured()) {
+    try {
+      const info = await scrapeItemInfo(url);
+      return { ok: true as const, ...info };
+    } catch (error) {
+      console.warn(`[extract] scraper API failed, using local extractor: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   try {
     const info = await extractItemInfoFromPage(url);
