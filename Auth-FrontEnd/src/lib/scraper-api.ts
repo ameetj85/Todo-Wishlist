@@ -40,8 +40,8 @@ function createScraperToken() {
   return `${unsigned}.${signature}`;
 }
 
-export function isScraperApiConfigured() {
-  return !!process.env.URL_SCRAPER_API_URL?.trim();
+export function isExternalScraperApiEnabled() {
+  return process.env.USE_EXTERNAL_SCRAPER_API?.trim().toLowerCase() === "true";
 }
 
 /** Asks the URL scraper API (URL_SCRAPER_API_URL) for the title, price and image of a product page. */
