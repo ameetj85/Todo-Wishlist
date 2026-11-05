@@ -2,6 +2,7 @@
 
 import { getAuthToken } from "@/lib/auth-cookie";
 import { compressImageForStorage, extractItemInfoFromPage } from "@/lib/extract-image";
+import { isExternalScraperApiEnabled, scrapeItemInfo } from "@/lib/scraper-api";
 
 type WishlistPayload = {
   title: string;
@@ -119,9 +120,11 @@ export async function extractWishlistItemInfoAction(url: string) {
   if (!tokenResult.ok) return { ok: false as const, error: tokenResult.error, title: null, price: null, imageBase64: null };
 
   try {
-    const info = await extractItemInfoFromPage(url);
+    // USE_EXTERNAL_SCRAPER_API picks the extractor: the URL scraper API when true, otherwise the in-process one.
+    const info = isExternalScraperApiEnabled() ? await scrapeItemInfo(url) : await extractItemInfoFromPage(url);
     return { ok: true as const, ...info };
-  } catch {
+  } catch (error) {
+    console.warn(`[extract] extraction failed: ${error instanceof Error ? error.message : String(error)}`);
     return { ok: false as const, error: "Unable to read that page", title: null, price: null, imageBase64: null };
   }
 }
