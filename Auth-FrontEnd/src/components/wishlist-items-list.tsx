@@ -500,6 +500,12 @@ export function WishlistItemsList({ initialItems }: WishlistItemsListProps) {
           {item.title}
         </p>
 
+        {item.description ? (
+          <p className="line-clamp-3 whitespace-pre-line break-words text-sm text-muted-foreground">
+            {item.description}
+          </p>
+        ) : null}
+
         <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${getPriorityChipClasses(item.priority)}`}
